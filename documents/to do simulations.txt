@@ -1,5 +1,5 @@
-1. Path integration: so that after finding the food source the 			ant can go straight forward to the nest location using 		only the relative calculated Angle and distance 				approximation.
+1. Path integration: so that after finding the food source the ant can go straight forward to the nest location using only the relative calculated Angle and distance approximation.
 
-2. Richest food source: implement a model where the colony can 			choose between different food sources but each one 			have a different nutritional value than the others.
+2. Richest food source: implement a model where the colony can choose between different food sources but each one have a different nutritional value than the others.
 
-3.  
+3.  add others

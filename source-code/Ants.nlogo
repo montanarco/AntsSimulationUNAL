@@ -1,3 +1,6 @@
+breed [ants ant] ;; ants breed is declared
+ants-own [log_n1 log_n ang_n1 ang_n delta cont] ;; variables to meassure the distance and turning angle
+
 patches-own [
   chemical             ;; amount of chemical on this patch
   food                 ;; amount of food on this patch (0, 1, or 2)
@@ -12,10 +15,16 @@ patches-own [
 
 to setup
   clear-all
-  set-default-shape turtles "bug"
-  create-turtles population
-  [ set size 2         ;; easier to see
-    set color red  ]   ;; red = not carrying food
+  set-default-shape ants "bug"
+  create-ants population
+  [ set size   2         ;; easier to see
+    set color  red       ;; red = not carrying food
+    set log_n  1         ;; init distance is one
+    set log_n1 1
+    set ang_n  0         ;; init angle is zero
+    set ang_n1 0
+    set delta  0        ;; angle varition after in each step
+    set cont 0 ]
   setup-patches
   reset-ticks
 end
@@ -67,12 +76,20 @@ end
 
 to go  ;; forever button
   ask turtles
-  [ if who >= ticks [ stop ] ;; delay initial departure
+  [ if who >= ticks [ stop ]      ;; delay initial departure
     ifelse color = red
-    [ look-for-food  ]       ;; not carrying food? look for it
-    [ return-to-nest ]       ;; carrying food? take it back to nest
-    wiggle
-    fd 1 ]
+    [ look-for-food               ;; not carrying food? look for it
+      wiggle
+      if not nest?
+      [calculate-dir-dist]        ;; vector calculation base on Muller & Wehner 1988
+    ]
+    [ return-to-nest              ;; carrying food? take it back to nest
+    set log_n1 log_n1 - 1         ;; if the ant goes to the nest the distance is smaller
+    ]
+    ifelse log_n1 > 0             ;; ant thinks the nest is close
+    [ fd 1 ]
+    [ search-nest-here ]          ;; loop right an then loop left to search for the nest
+  ]
   diffuse chemical (diffusion-rate / 100)
   ask patches
   [ set chemical chemical * (100 - evaporation-rate) / 100  ;; slowly evaporate chemical
@@ -84,9 +101,17 @@ to return-to-nest  ;; turtle procedure
   ifelse nest?
   [ ;; drop food and head out again
     set color red
+    set log_n  2
+    set log_n1 2
+    set ang_n  0
+    set ang_n1 0
+    set delta  0
+    set cont 0
     rt 180 ]
   [ set chemical chemical + 60  ;; drop some chemical
-    uphill-nest-scent ]         ;; head toward the greatest value of nest-scent
+    ;;uphill-nest-scent          ;; head toward the greatest value of nest-scent
+    follow-integrated-path
+    ]
 end
 
 to look-for-food  ;; turtle procedure
@@ -100,6 +125,35 @@ to look-for-food  ;; turtle procedure
   [ uphill-chemical ]
 end
 
+to calculate-dir-dist
+    set log_n log_n1              ;; if the ant goes in search of food the distance to the nest gets bigger
+    set log_n1 (log_n + 1) - (delta / 90)
+    set ang_n ang_n1
+    set ang_n1 (ang_n + (delta / log_n))
+    set delta 0
+end
+
+;; try to go to the nest following the record of distance an the angle he stored
+to follow-integrated-path
+  lt ang_n1       ;; if angle is positive it has turned more to the right
+                  ;; so to return it has to turn to the left the same degrees
+                  ;; if the angle is negative it will turn to the oposite site, this is rigth
+  if not can-move? 1 [ rt 180 ]
+  set ang_n1 0    ;; as it is supose to go heading to the nest the angle should be 0
+end
+
+to search-nest-here
+  if cont < 4                  ;; first it search to the rigth
+    [set log_n1 5
+     rt 90
+     set cont cont + 1
+    ]
+  if cont < 8
+    [set log_n1 5              ;; then it search to the left
+     lt 90
+     set cont cont + 1]
+end
+
 ;; sniff left and right, and go where the strongest smell is
 to uphill-chemical  ;; turtle procedure
   let scent-ahead chemical-scent-at-angle   0
@@ -107,8 +161,13 @@ to uphill-chemical  ;; turtle procedure
   let scent-left  chemical-scent-at-angle -45
   if (scent-right > scent-ahead) or (scent-left > scent-ahead)
   [ ifelse scent-right > scent-left
-    [ rt 45 ]
-    [ lt 45 ] ]
+    [ rt 45
+      set delta delta + 45 ;; store the angle the ants has turned in search of pheromone
+    ]
+    [ lt 45
+      set delta delta - 45 ;; store the angle the ants has turned in search of pheromone
+    ]
+  ]
 end
 
 ;; sniff left and right, and go where the strongest smell is
@@ -123,9 +182,15 @@ to uphill-nest-scent  ;; turtle procedure
 end
 
 to wiggle  ;; turtle procedure
-  rt random 40
-  lt random 40
-  if not can-move? 1 [ rt 180 ]
+  let ranright random 40
+  let ranleft random 40
+  rt ranright
+  lt ranleft
+  set delta delta + ranright - ranleft
+  if not can-move? 1
+  [ rt 180
+    set delta delta + 180
+  ]
 end
 
 to-report nest-scent-at-angle [angle]
