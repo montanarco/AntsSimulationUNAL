@@ -1,5 +1,5 @@
 breed [ants ant] ;; ants breed is declared
-ants-own [log_n1 log_n ang_n1 ang_n delta cont] ;; variables to meassure the distance and turning angle
+ants-own [steps log_n1 log_n ang_n1 ang_n delta cont] ;; variables to meassure the distance and turning angle
 
 patches-own [
   chemical             ;; amount of chemical on this patch
@@ -19,21 +19,26 @@ to setup
   create-ants population
   [ set size   2         ;; easier to see
     set color  red       ;; red = not carrying food
-    set log_n  1         ;; init distance is one
+    set steps  0
+    set log_n  0
     set log_n1 1
     set ang_n  0         ;; init angle is zero
     set ang_n1 0
     set delta  0        ;; angle varition after in each step
-    set cont 0 ]
+    set cont 0
+    set heading 0
+    pen-down
+    fd 1
+  ]
   setup-patches
   reset-ticks
+  stop-inspecting-dead-agents
+  inspect ant 0
 end
 
 to setup-patches
   ask patches
-  [ setup-nest
-    setup-food
-    recolor-patch ]
+  [ setup-nest ]
 end
 
 to setup-nest  ;; patch procedure
@@ -41,33 +46,10 @@ to setup-nest  ;; patch procedure
   set nest? (distancexy 0 0) < 5
   ;; spread a nest-scent over the whole world -- stronger near the nest
   set nest-scent 200 - distancexy 0 0
-end
-
-to setup-food  ;; patch procedure
-  ;; setup food source one on the right
-  if (distancexy (0.6 * max-pxcor) 0) < 5
-  [ set food-source-number 1 ]
-  ;; setup food source two on the lower-left
-  if (distancexy (-0.6 * max-pxcor) (-0.6 * max-pycor)) < 5
-  [ set food-source-number 2 ]
-  ;; setup food source three on the upper-left
-  if (distancexy (-0.8 * max-pxcor) (0.8 * max-pycor)) < 5
-  [ set food-source-number 3 ]
-  ;; set "food" at sources to either 1 or 2, randomly
-  if food-source-number > 0
-  [ set food one-of [1 2] ]
-end
-
-to recolor-patch  ;; patch procedure
-  ;; give color to nest and food sources
-  ifelse nest?
+  ;; give color to nest
+  if nest?
   [ set pcolor violet ]
-  [ ifelse food > 0
-    [ if food-source-number = 1 [ set pcolor cyan ]
-      if food-source-number = 2 [ set pcolor sky  ]
-      if food-source-number = 3 [ set pcolor blue ] ]
-    ;; scale color to show chemical concentration
-    [ set pcolor scale-color green chemical 0.1 5 ] ]
+
 end
 
 ;;;;;;;;;;;;;;;;;;;;;
@@ -75,26 +57,26 @@ end
 ;;;;;;;;;;;;;;;;;;;;;
 
 to go  ;; forever button
+
   ask turtles
-  [ if who >= ticks [ stop ]      ;; delay initial departure
-    ifelse color = red
-    [ look-for-food               ;; not carrying food? look for it
+  [
+    ifelse steps < 80
+    [
       wiggle
-      if not nest?
-      [calculate-dir-dist]        ;; vector calculation base on Muller & Wehner 1988
+      calculate-dir-dist        ;; vector calculation base on Muller & Wehner 1988
+      fd 1
     ]
-    [ return-to-nest              ;; carrying food? take it back to nest
-    set log_n1 log_n1 - 1         ;; if the ant goes to the nest the distance is smaller
+    [
+      set color blue
+      return-to-nest              ;; carrying food? take it back to nest
+      set log_n1 log_n1 - 1         ;; if the ant goes to the nest the distance is smaller
+      if log_n1 > 0             ;; Move unless we are near our target when returning
+      [ fd 1 ]
     ]
-    ifelse log_n1 > 0             ;; ant thinks the nest is close
-    [ fd 1 ]
-    [ search-nest-here ]          ;; loop right an then loop left to search for the nest
+
+    set steps steps + 1
   ]
-  diffuse chemical (diffusion-rate / 100)
-  ask patches
-  [ set chemical chemical * (100 - evaporation-rate) / 100  ;; slowly evaporate chemical
-    recolor-patch ]
-  tick
+
 end
 
 to return-to-nest  ;; turtle procedure
@@ -109,100 +91,36 @@ to return-to-nest  ;; turtle procedure
     set cont 0
     rt 180 ]
   [ set chemical chemical + 60  ;; drop some chemical
-    ;;uphill-nest-scent          ;; head toward the greatest value of nest-scent
     follow-integrated-path
     ]
 end
 
-to look-for-food  ;; turtle procedure
-  if food > 0
-  [ set color orange + 1     ;; pick up food
-    set food food - 1        ;; and reduce the food source
-    rt 180                   ;; and turn around
-    stop ]
-  ;; go in the direction where the chemical smell is strongest
-  if (chemical >= 0.05) and (chemical < 2)
-  [ uphill-chemical ]
-end
-
 to calculate-dir-dist
-    set log_n log_n1              ;; if the ant goes in search of food the distance to the nest gets bigger
-    set log_n1 (log_n + 1) - (delta / 90)
-    set ang_n ang_n1
-    set ang_n1 (ang_n + (delta / log_n))
-    set delta 0
+  let k 4.009e-5
+
+  set log_n log_n1              ;; if the ant goes in search of food the distance to the nest gets bigger
+  set ang_n ang_n1
+
+  set log_n1 log_n + 1 - (delta / 90)
+  let numerator (180 + delta) * (180 - delta) * delta
+  set ang_n1 ang_n + ((k * numerator) / log_n)
+  set ang_n1 (ang_n1 + 360) mod 360
+
+  set delta 0
 end
 
 ;; try to go to the nest following the record of distance an the angle he stored
 to follow-integrated-path
-  lt ang_n1       ;; if angle is positive it has turned more to the right
-                  ;; so to return it has to turn to the left the same degrees
-                  ;; if the angle is negative it will turn to the oposite site, this is rigth
-  if not can-move? 1 [ rt 180 ]
-  set ang_n1 0    ;; as it is supose to go heading to the nest the angle should be 0
-end
-
-to search-nest-here
-  if cont < 4                  ;; first it search to the rigth
-    [set log_n1 5
-     rt 90
-     set cont cont + 1
-    ]
-  if cont < 8
-    [set log_n1 5              ;; then it search to the left
-     lt 90
-     set cont cont + 1]
-end
-
-;; sniff left and right, and go where the strongest smell is
-to uphill-chemical  ;; turtle procedure
-  let scent-ahead chemical-scent-at-angle   0
-  let scent-right chemical-scent-at-angle  45
-  let scent-left  chemical-scent-at-angle -45
-  if (scent-right > scent-ahead) or (scent-left > scent-ahead)
-  [ ifelse scent-right > scent-left
-    [ rt 45
-      set delta delta + 45 ;; store the angle the ants has turned in search of pheromone
-    ]
-    [ lt 45
-      set delta delta - 45 ;; store the angle the ants has turned in search of pheromone
-    ]
-  ]
-end
-
-;; sniff left and right, and go where the strongest smell is
-to uphill-nest-scent  ;; turtle procedure
-  let scent-ahead nest-scent-at-angle   0
-  let scent-right nest-scent-at-angle  45
-  let scent-left  nest-scent-at-angle -45
-  if (scent-right > scent-ahead) or (scent-left > scent-ahead)
-  [ ifelse scent-right > scent-left
-    [ rt 45 ]
-    [ lt 45 ] ]
+  set heading 180 + ang_n
+  ;; rt 180 - ang_n
+  ;; set ang_n 180
 end
 
 to wiggle  ;; turtle procedure
-  let ranright random 40
-  let ranleft random 40
-  rt ranright
-  lt ranleft
-  set delta delta + ranright - ranleft
-  if not can-move? 1
-  [ rt 180
-    set delta delta + 180
-  ]
-end
-
-to-report nest-scent-at-angle [angle]
-  let p patch-right-and-ahead angle 1
-  if p = nobody [ report 0 ]
-  report [nest-scent] of p
-end
-
-to-report chemical-scent-at-angle [angle]
-  let p patch-right-and-ahead angle 1
-  if p = nobody [ report 0 ]
-  report [chemical] of p
+  let ranright random 20
+  let ranleft random 20
+  set delta ranright - ranleft
+  rt delta
 end
 
 
@@ -210,10 +128,10 @@ end
 ; See Info tab for full copyright and license.
 @#$#@#$#@
 GRAPHICS-WINDOW
-257
+336
 10
-762
-516
+1471
+1146
 -1
 -1
 7.0
@@ -226,12 +144,12 @@ GRAPHICS-WINDOW
 0
 0
 1
--35
-35
--35
-35
-1
-1
+-80
+80
+-80
+80
+0
+0
 1
 ticks
 30.0
@@ -309,7 +227,7 @@ population
 population
 0.0
 200.0
-125.0
+5.0
 1.0
 1
 NIL
