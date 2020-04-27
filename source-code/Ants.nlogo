@@ -23,10 +23,10 @@ to setup
     set log_n  0
     set log_n1 1
     set ang_n  0         ;; init angle is zero
-    set ang_n1 0
+    set ang_n1 initial_heading
     set delta  0        ;; angle varition after in each step
     set cont 0
-    set heading 0
+    set heading initial_heading
     pen-down
     fd 1
   ]
@@ -112,7 +112,7 @@ end
 ;; try to go to the nest following the record of distance an the angle he stored
 to follow-integrated-path
   set heading 180 + ang_n
-  ;; rt 180 - ang_n
+  ;; rt 180 + ang_n
   ;; set ang_n 180
 end
 
@@ -171,36 +171,6 @@ NIL
 NIL
 1
 
-SLIDER
-31
-106
-221
-139
-diffusion-rate
-diffusion-rate
-0.0
-99.0
-50.0
-1.0
-1
-NIL
-HORIZONTAL
-
-SLIDER
-31
-141
-221
-174
-evaporation-rate
-evaporation-rate
-0.0
-99.0
-10.0
-1.0
-1
-NIL
-HORIZONTAL
-
 BUTTON
 136
 71
@@ -233,25 +203,20 @@ population
 NIL
 HORIZONTAL
 
-PLOT
-5
-197
-248
-476
-Food in each pile
-time
-food
+SLIDER
+39
+133
+211
+166
+initial_heading
+initial_heading
+0
+360
 0.0
-50.0
-0.0
-120.0
-true
-false
-"" ""
-PENS
-"food-in-pile1" 1.0 0 -11221820 true "" "plotxy ticks sum [food] of patches with [pcolor = cyan]"
-"food-in-pile2" 1.0 0 -13791810 true "" "plotxy ticks sum [food] of patches with [pcolor = sky]"
-"food-in-pile3" 1.0 0 -13345367 true "" "plotxy ticks sum [food] of patches with [pcolor = blue]"
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
