@@ -165,7 +165,7 @@ to follow-ant
   stop
 end
 
-to follow-ant
+to exploit
   ifelse nest?
   [set state "waiting"
    stop
