@@ -19,7 +19,7 @@ to setup
   create-ants population
   [ set size   2         ;; easier to see
     set color  red       ;; red = not carrying food
-    set steps  0
+    set steps  1
     set log_n  0
     set log_n1 1
     set ang_n  0         ;; init angle is zero
@@ -60,7 +60,7 @@ to go  ;; forever button
 
   ask turtles
   [
-    ifelse steps < 80
+    ifelse steps < outgoing_steps
     [
       wiggle
       calculate-dir-dist        ;; vector calculation base on Muller & Wehner 1988
@@ -80,19 +80,7 @@ to go  ;; forever button
 end
 
 to return-to-nest  ;; turtle procedure
-  ifelse nest?
-  [ ;; drop food and head out again
-    set color red
-    set log_n  2
-    set log_n1 2
-    set ang_n  0
-    set ang_n1 0
-    set delta  0
-    set cont 0
-    rt 180 ]
-  [ set chemical chemical + 60  ;; drop some chemical
-    follow-integrated-path
-    ]
+  follow-integrated-path
 end
 
 to calculate-dir-dist
@@ -111,14 +99,15 @@ end
 
 ;; try to go to the nest following the record of distance an the angle he stored
 to follow-integrated-path
-  set heading 180 + ang_n
-  ;; rt 180 + ang_n
-  ;; set ang_n 180
+  ;; set heading 180 + ang_n
+  rt 180 + ang_n
+  set ang_n 180
 end
 
 to wiggle  ;; turtle procedure
-  let ranright random 20
-  let ranleft random 20
+  let max_angle per_step_max_rotation / (1 + (exp (-0.1 * (steps - (per_step_max_rotation / 2))) ) )
+  let ranright random max_angle
+  let ranleft random max_angle
   set delta ranright - ranleft
   rt delta
 end
@@ -214,6 +203,36 @@ initial_heading
 360
 0.0
 1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+51
+191
+223
+224
+outgoing_steps
+outgoing_steps
+10
+400
+150.0
+10
+1
+NIL
+HORIZONTAL
+
+SLIDER
+56
+238
+236
+271
+per_step_max_rotation
+per_step_max_rotation
+0
+180
+120.0
+5
 1
 NIL
 HORIZONTAL
