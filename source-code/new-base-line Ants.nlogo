@@ -1,14 +1,13 @@
 ;;Extensions
 extensions [array]
 
-
 ;;globals
-globals [arr evaporation-rate]
+globals []
 breed [ants ant]     ;; ants breed is declared
 ants-own [state cont];; ant atributes
 patches-own [
   chemical             ;; amount of chemical on this patch
-  food?                 ;; amount of food on this patch (0, 1, or 2)
+  food?                ;; amount of food on this patch (0, 1, or 2)
   nest?                ;; true on nest patches, false elsewhere
 ]
 
@@ -20,6 +19,7 @@ to setup
   clear-all
   set-default-shape ants "bug"
   ;;calculate random locations for the nest and the ants
+  random-seed ran-seed ;; Useful to have repeatable experiments
   let nest-xcor random-location min-pxcor max-pxcor
   let nest-ycor random-location min-pycor max-pycor
   create-ants population
@@ -29,55 +29,48 @@ to setup
     set xcor nest-xcor
     set ycor nest-ycor
   ]
-  let num-food 3
-  set evaporation-rate 10
-  setup-patches nest-xcor nest-ycor num-food
+  setup-patches nest-xcor nest-ycor
   reset-ticks
 end
 
-
-
-to setup-patches [nest-xcor nest-ycor num-food]
-  ;; mecanismo para encontrar aleatoriamente las coordenadas de las fuentes de comida
-  let arrayLength num-food * 2
-  set arr array:from-list n-values arrayLength [0]
-  set arr find-food-location arr
-  let food-1 (random 7) + 2
-  let food-2 (random 7) + 2
-  let food-3 (random 7) + 2
-  ask patches
-  [ setup-nest nest-xcor nest-ycor ;; poner el nido en el lugar aleatorio
-    setup-food food-1 food-2 food-3
-    recolor-patch
+to setup-patches [nest-xcor nest-ycor]
+  ask patches [
+    ;; Initialize patches as not being food or nest
+    set food? false
+    set nest? false
   ]
-end
-
-to-report find-food-location [arreglo]
-  let contador 0
-  let limite array:length arreglo
-  while [contador < limite][
-    let x-coord random-location min-pxcor max-pxcor
-    let y-coord random-location min-pycor max-pycor
-    ;;let ocupied-loc is-here-any-nest x-coord y-coord  ;; corregir metodo para validar si ya existe un nido en la ubicacion donde vamos a poner las fuentes de comida
-    let free-loc false
-    if (not free-loc)[
-      array:set arreglo contador x-coord
-      array:set arreglo (contador + 1) y-coord
-    ]
-  set contador contador + 2
+  setup-food-sources
+  ask patches [
+    setup-nest nest-xcor nest-ycor ;; Place the nest at a random point
+    recolor-patch ;; Color all the patches depending if they are food source or nest
   ]
-  report arreglo
 end
 
 to setup-nest [patch-xcor patch-pycor]
   set nest? (distancexy patch-xcor patch-pycor) < 5
+  if nest? [
+    ;; If this is part of the nest, disable food sources
+    set food? false
+  ]
 end
 
-;; este metodo debe ser mejorado para poner las fuentes de comida dinamicamente y no llamarlo de forma repetitiva
-to setup-food [food-1 food-2 food-3]
-  set food? (distancexy array:item arr 0 array:item arr 1) < food-1 or
-  (distancexy array:item arr 2 array:item arr 3) < food-2 or
-  (distancexy array:item arr 4 array:item arr 5) < food-3
+;; Sets the number of food sources indicated by the food-sources slider
+to setup-food-sources
+  repeat food-sources [
+    ;; Get center for new patch
+    let x-coord random-location min-pxcor max-pxcor
+    let y-coord random-location min-pycor max-pycor
+    let food-size random max-food-size
+
+    ;; Get the patch for the center of the food source
+    ask patch x-coord y-coord [
+      ;; Find the patches around the center and set them as food
+      ask patches in-radius food-size [
+        set food? food? OR (distancexy x-coord y-coord) <= food-size ;; This condition is required to make sources round, can be replaced with true
+      ]
+    ]
+
+  ]
 end
 
 to-report any-nest-here [x-coord y-coord]
@@ -233,7 +226,7 @@ population
 population
 1
 50
-6.0
+50.0
 1
 1
 NIL
@@ -282,8 +275,68 @@ diffusion-rate
 diffusion-rate
 0.0
 99.0
-10.0
+3.0
 1.0
+1
+NIL
+HORIZONTAL
+
+SLIDER
+21
+370
+193
+403
+food-sources
+food-sources
+0
+2000
+484.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+26
+1092
+198
+1125
+ran-seed
+ran-seed
+0
+10000
+3185.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+22
+420
+194
+453
+max-food-size
+max-food-size
+1
+50
+7.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+25
+197
+197
+230
+evaporation-rate
+evaporation-rate
+0
+10
+4.0
+1
 1
 NIL
 HORIZONTAL
