@@ -4,7 +4,7 @@ extensions [array]
 ;;globals
 globals []
 breed [ants ant]     ;; ants breed is declared
-ants-own [state cont];; ant atributes
+ants-own [state cont loaded? steps];; ant atributes
 patches-own [
   chemical             ;; amount of chemical on this patch
   food?                ;; amount of food on this patch (0, 1, or 2)
@@ -28,6 +28,9 @@ to setup
     set state "searching"
     set xcor nest-xcor
     set ycor nest-ycor
+    set steps 0
+    set loaded? false
+    if trace? [ pen-down ]
   ]
   setup-patches nest-xcor nest-ycor
   reset-ticks
@@ -145,13 +148,22 @@ to hold
 end
 
 to search
-  if food?
-  [ set state "exploiting"
-    set food? false
+  ;; Food has been found, proceed to exploiting state
+  if food? [
+    set state "exploiting"
     stop
   ]
-  wiggle
-  fd 1
+  ;; We are at the nest, define a heading at random and step out of it
+  ifelse nest? [
+    set steps 0
+    set heading random 360
+    fd 6
+  ][
+    ;; Otherwise just search at random
+    wiggle
+    fd 1
+    set steps steps + 1
+  ]
 end
 
 to follow-ant
@@ -159,8 +171,14 @@ to follow-ant
 end
 
 to exploit
-  ifelse nest?
-  [set state "waiting"
+  if food? and not loaded? [
+    set food? false
+    set loaded? true
+  ]
+
+  ifelse nest? [
+   set loaded? false
+   set state "searching"
    stop
   ]
   [
@@ -178,8 +196,12 @@ end
 
 
 to wiggle  ;; turtle procedure
-  rt random 40
-  lt random 40
+  ;; Move with less variability when getting out of the nest
+  let max_angle per_step_max_rotation / (1 + (exp (-0.1 * (steps - (per_step_max_rotation / 2))) ) )
+  let ranright random max_angle
+  let ranleft random max_angle
+  let delta ranright - ranleft
+  rt delta
   if not can-move? 1
   [ rt 180 ]
 end
@@ -226,7 +248,7 @@ population
 population
 1
 50
-50.0
+3.0
 1
 1
 NIL
@@ -290,7 +312,7 @@ food-sources
 food-sources
 0
 2000
-484.0
+7.0
 1
 1
 NIL
@@ -305,7 +327,7 @@ ran-seed
 ran-seed
 0
 10000
-3185.0
+3121.0
 1
 1
 NIL
@@ -320,7 +342,7 @@ max-food-size
 max-food-size
 1
 50
-7.0
+8.0
 1
 1
 NIL
@@ -340,6 +362,32 @@ evaporation-rate
 1
 NIL
 HORIZONTAL
+
+SLIDER
+25
+243
+205
+276
+per_step_max_rotation
+per_step_max_rotation
+0
+180
+50.0
+5
+1
+NIL
+HORIZONTAL
+
+SWITCH
+27
+1141
+130
+1174
+trace?
+trace?
+0
+1
+-1000
 
 @#$#@#$#@
 ## WHAT IS IT?
