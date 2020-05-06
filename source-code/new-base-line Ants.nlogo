@@ -9,6 +9,7 @@ patches-own [
   chemical             ;; amount of chemical on this patch
   food?                ;; amount of food on this patch (0, 1, or 2)
   nest?                ;; true on nest patches, false elsewhere
+  food-scent
 ]
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -42,6 +43,7 @@ to setup-patches [nest-xcor nest-ycor]
     ;; Initialize patches as not being food or nest
     set food? false
     set nest? false
+    set food-scent 0
   ]
   setup-food-sources
   ask patches [
@@ -73,8 +75,8 @@ to setup-food-sources
         set food? food? OR (distancexy x-coord y-coord) <= food-size ;; This condition is required to make sources round, can be replaced with true
       ]
     ]
-
   ]
+
 end
 
 to-report any-nest-here [x-coord y-coord]
@@ -100,7 +102,14 @@ to recolor-patch  ;; patch procedure
   [ set pcolor violet ]
   [ifelse food?
     [ set pcolor sky  ]
-    [ set pcolor scale-color green chemical 0.1 5]
+    [
+      ;; If there is food-scent, show it
+      set pcolor scale-color pink food-scent 0.1 20
+      ;; If there is a trace of pheromone show it
+      if chemical > 0.1 [
+        set pcolor scale-color green chemical 0.01 5
+      ]
+    ]
   ]
 end
 
@@ -138,9 +147,19 @@ to go
   update-ant-state
   ]
   diffuse chemical (diffusion-rate / 100)
-  ask patches
-  [ set chemical chemical * (100 - evaporation-rate) / 100  ;; slowly evaporate chemical
-    recolor-patch ]
+  ask patches [
+    set chemical chemical * (100 - evaporation-rate) / 100  ;; slowly evaporate chemical
+    recolor-patch
+    ;; We need to lower the general level of food-scent since we are adding more constantly
+    set food-scent food-scent / 1.1
+  ]
+  ;; Add the food-scent
+  ask patches with [food?] [
+    set food-scent 20
+  ]
+  ;; And diffuse it
+  diffuse food-scent 0.3
+
   tick
 end
 
@@ -163,7 +182,7 @@ end
 to search
   set color red
   ;; Food has been found, proceed to exploiting state
-  if food? [
+  if food? OR food-scent > 0.1 [
     set state "exploiting"
     stop
   ]
@@ -186,19 +205,32 @@ end
 
 to exploit
   set color green
-  if food? and not loaded? [
-    set food? false
-    set loaded? true
+
+  ifelse loaded? [
+    ;; we have food, lets get it to the nest
+    ;; If we got to the nest -> unload food and restart searching
+    ifelse nest? [
+      set loaded? false
+      set state "searching"
+      stop
+    ] [
+      ;; Otherwise try to get to the nest
+      return-to-nest
+    ]
+  ] [
+    ;; We are not loaded, so we should try to grab food
+    ;; Is there food? ->  Grab it
+    if food? [
+      set food? false
+      set loaded? true
+    ]
+
+    ;; Is there the scent of food? -> move towards higher concentrations of it
+    if food-scent > 0.1 [
+      uphill food-scent
+    ]
   ]
 
-  ifelse nest? [
-   set loaded? false
-   set state "searching"
-   stop
-  ]
-  [
-    return-to-nest
-  ]
 end
 
 to recruit
@@ -263,7 +295,7 @@ population
 population
 1
 50
-21.0
+6.0
 1
 1
 NIL
@@ -327,7 +359,7 @@ food-sources
 food-sources
 0
 2000
-64.0
+13.0
 1
 1
 NIL
@@ -342,7 +374,7 @@ ran-seed
 ran-seed
 0
 10000
-5032.0
+1975.0
 1
 1
 NIL
@@ -357,7 +389,7 @@ max-food-size
 max-food-size
 1
 50
-9.0
+22.0
 1
 1
 NIL
@@ -400,7 +432,7 @@ SWITCH
 1174
 trace?
 trace?
-1
+0
 1
 -1000
 
@@ -413,7 +445,7 @@ max_fullness
 max_fullness
 0
 200
-200.0
+190.0
 5
 1
 NIL
