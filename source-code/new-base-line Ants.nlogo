@@ -4,7 +4,7 @@ extensions [array]
 ;;globals
 globals []
 breed [ants ant]     ;; ants breed is declared
-ants-own [state cont loaded? steps];; ant atributes
+ants-own [state cont loaded? steps fullness];; ant atributes
 patches-own [
   chemical             ;; amount of chemical on this patch
   food?                ;; amount of food on this patch (0, 1, or 2)
@@ -25,11 +25,12 @@ to setup
   create-ants population
   [ set size   2         ;; easier to see
     set color  red       ;; red = not carrying food
-    set state "searching"
+    set state "waiting"
     set xcor nest-xcor
     set ycor nest-ycor
     set steps 0
     set loaded? false
+    set fullness random max_fullness
     if trace? [ pen-down ]
   ]
   setup-patches nest-xcor nest-ycor
@@ -144,20 +145,33 @@ to go
 end
 
 to hold
+  set color white
+  ;; While idle, the ant consumes its food reserves
+  set fullness fullness - 1
+  ifelse fullness = 0  [
+    ;; Bellow the hunger threshold, switch to searching
+    set state "searching"
+  ] [
+    ;; Move inside the nest
+    let target one-of neighbors with [nest?]
+    face target
+    move-to target
+  ]
   stop
 end
 
 to search
+  set color red
   ;; Food has been found, proceed to exploiting state
   if food? [
     set state "exploiting"
     stop
   ]
   ;; We are at the nest, define a heading at random and step out of it
-  ifelse nest? [
-    set steps 0
+  ifelse nest? and steps = 0 [
+    set steps 1
     set heading random 360
-    fd 6
+    fd 1
   ][
     ;; Otherwise just search at random
     wiggle
@@ -171,6 +185,7 @@ to follow-ant
 end
 
 to exploit
+  set color green
   if food? and not loaded? [
     set food? false
     set loaded? true
@@ -248,7 +263,7 @@ population
 population
 1
 50
-3.0
+21.0
 1
 1
 NIL
@@ -297,7 +312,7 @@ diffusion-rate
 diffusion-rate
 0.0
 99.0
-3.0
+28.0
 1.0
 1
 NIL
@@ -312,7 +327,7 @@ food-sources
 food-sources
 0
 2000
-7.0
+64.0
 1
 1
 NIL
@@ -327,7 +342,7 @@ ran-seed
 ran-seed
 0
 10000
-3121.0
+5032.0
 1
 1
 NIL
@@ -342,7 +357,7 @@ max-food-size
 max-food-size
 1
 50
-8.0
+9.0
 1
 1
 NIL
@@ -357,7 +372,7 @@ evaporation-rate
 evaporation-rate
 0
 10
-4.0
+2.0
 1
 1
 NIL
@@ -385,9 +400,24 @@ SWITCH
 1174
 trace?
 trace?
-0
+1
 1
 -1000
+
+SLIDER
+24
+460
+196
+493
+max_fullness
+max_fullness
+0
+200
+200.0
+5
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
