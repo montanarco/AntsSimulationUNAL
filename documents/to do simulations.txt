@@ -2,4 +2,7 @@
 
 2. Richest food source: implement a model where the colony can choose between different food sources but each one have a different nutritional value than the others.
 
-3.  add others
+3.  recruitment: 
+Mechanic: 	A. by carring an ant of the next to the food source 
+		B. tandem guiding by little touch of ant to the leader 		body
+Chamical:  C. spreading a pheromone to comunicate other ants   			around help is requiered to carry a big nutritious 			food piece 

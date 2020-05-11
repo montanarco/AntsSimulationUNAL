@@ -2,14 +2,26 @@
 extensions [array]
 
 ;;globals
-globals []
-breed [ants ant]     ;; ants breed is declared
-ants-own [state cont loaded? steps fullness];; ant atributes
+globals [nest-xcor nest-ycor]
+breed [ants ant]        ;; ants breed is declared
+
+ants-own [              ;; ant atributes
+  state
+  loaded?               ;; this informs if the ant is or not carring food
+  steps                 ;; number of steps the ant do to after leaving the nest and until it find a food location
+  fullness              ;; this variable measures if the ant feels hungry, so it can start looking for food
+  food-x                ;; the x coordinate where the ant found food the last time
+  food-y                ;; the y coordinate where the ant found food the last time
+  f-memory              ;; indicate if the ant have found any food source
+  leader                ;; use to indicate other ants to follow self to be guided to the food source
+]
+
 patches-own [
   chemical             ;; amount of chemical on this patch
   food?                ;; amount of food on this patch (0, 1, or 2)
   nest?                ;; true on nest patches, false elsewhere
-  food-scent
+  nest-scent           ;; number that is higher closer to the nest
+  food-scent           ;; the smell a food source produces in the neigbors around
 ]
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -21,8 +33,8 @@ to setup
   set-default-shape ants "bug"
   ;;calculate random locations for the nest and the ants
   random-seed ran-seed ;; Useful to have repeatable experiments
-  let nest-xcor random-location min-pxcor max-pxcor
-  let nest-ycor random-location min-pycor max-pycor
+  set nest-xcor random-location min-pxcor max-pxcor
+  set nest-ycor random-location min-pycor max-pycor
   create-ants population
   [ set size   2         ;; easier to see
     set color  red       ;; red = not carrying food
@@ -32,13 +44,14 @@ to setup
     set steps 0
     set loaded? false
     set fullness random max_fullness
-    if trace? [ pen-down ]
+    set f-memory false
+    ;;if trace? [ pen-down ]
   ]
-  setup-patches nest-xcor nest-ycor
+  setup-patches
   reset-ticks
 end
 
-to setup-patches [nest-xcor nest-ycor]
+to setup-patches
   ask patches [
     ;; Initialize patches as not being food or nest
     set food? false
@@ -79,25 +92,8 @@ to setup-food-sources
 
 end
 
-to-report any-nest-here [x-coord y-coord]
-    ;;let pat patch-at x-coord y-coord
-    ;; se verifica si en las parcelas alrededor hay nidos
-    let nest-up    nest-at (x-coord + 10) y-coord
-    let nest-down  nest-at (x-coord - 10)  y-coord
-    let nest-rigth nest-at x-coord (y-coord + 10)
-    let nest-left  nest-at x-coord (y-coord - 10)
-    let suma nest-up + nest-down + nest-left  + nest-rigth
-    if (suma = 0) [report false]
-    report true
-end
-
-to-report any-food-here [x-cord y-cord]
-  let pat patch-at x-cord y-cord
-  if pat = nobody [ report false ]
-  report [food?] of pat
-end
-
-to recolor-patch  ;; patch procedure
+;; @**********@ patch procedure @**********@ ;;
+to recolor-patch
   ifelse nest?
   [ set pcolor violet ]
   [ifelse food?
@@ -113,6 +109,7 @@ to recolor-patch  ;; patch procedure
   ]
 end
 
+;; @**********@ patch procedure @**********@ ;;
 to-report random-location [minvalue maxvalue]
   let location (random maxvalue) * ((-1) ^ one-of[1 2])
   if (location >= (maxvalue - 10)) [
@@ -124,12 +121,6 @@ to-report random-location [minvalue maxvalue]
   report location
 end
 
-to-report nest-at [angle dist]
-  let pat patch-at angle dist
-  if pat = nobody [report 0]
-  report [nest?] of pat
-end
-
 ;;;;;;;;;;;;;;;;;;;;;
 ;;; Go procedures ;;;
 ;;;;;;;;;;;;;;;;;;;;;
@@ -138,31 +129,37 @@ to go
   ask turtles
   [
   if who >= ticks [ stop ] ;; delay initial departure
-
+  ;; works like an case statement so depending on the state the ant excecutes a particular behaviour
   if (state = "waiting" ) [hold]
   if (state = "searching" ) [search]
   if (state = "following" ) [follow-ant]
   if (state = "exploiting" ) [exploit]
   if (state = "recruiting" ) [recruit]
-  update-ant-state
   ]
-  diffuse chemical (diffusion-rate / 100)
-  ask patches [
-    set chemical chemical * (100 - evaporation-rate) / 100  ;; slowly evaporate chemical
-    recolor-patch
-    ;; We need to lower the general level of food-scent since we are adding more constantly
-    set food-scent food-scent / 1.1
-  ]
+
+  diffuse-chemical
+
   ;; Add the food-scent
   ask patches with [food?] [
     set food-scent 20
   ]
   ;; And diffuse it
   diffuse food-scent 0.3
-
   tick
 end
 
+;; @**********@ patch procedure @**********@ ;;
+to diffuse-chemical
+ diffuse chemical (diffusion-rate / 100)
+  ask patches [
+    set chemical chemical * (100 - evaporation-rate) / 100  ;; slowly evaporate chemical
+    recolor-patch
+    ;; We need to lower the general level of food-scent since we are adding more constantly
+    set food-scent food-scent / 1.1
+  ]
+end
+
+;; @**********@ agent method @**********@ ;;
 to hold
   set color white
   ;; While idle, the ant consumes its food reserves
@@ -179,30 +176,62 @@ to hold
   stop
 end
 
+;; @**********@ agent method @**********@ ;;
 to search
   set color red
   ;; Food has been found, proceed to exploiting state
   if food? OR food-scent > 0.1 [
     set state "exploiting"
+    record-food-location
     stop
   ]
   ;; We are at the nest, define a heading at random and step out of it
-  ifelse nest? and steps = 0 [
+  ifelse nest? and steps = 0
+  [
     set steps 1
     set heading random 360
     fd 1
-  ][
-    ;; Otherwise just search at random
-    wiggle
-    fd 1
-    set steps steps + 1
   ]
+  [
+    ;; when the ant remembers a location where it has found any food, it goes back to check if there is more
+    ifelse f-memory
+    [ set leader true
+      go-last-food-source
+    ]
+    [
+    ;; Otherwise just search at random
+    ifelse (chemical >= 0.05) and (chemical < 2)    ;; original mecanism of pheromone following
+       [join-chemical]
+       [wiggle]
+    ]
+
+  ]
+  fd 1
+  set steps steps + 1
 end
 
+;; @**********@ agent method @**********@ ;;
+;; this stores the coordinates where food source was found
+to record-food-location
+  set f-memory true
+  set food-x xcor
+  set food-y ycor
+end
+
+;; @**********@ agent method @**********@ ;;
 to follow-ant
-  stop
+ if loaded?
+  [ set state "searching"
+    stop]
+
+  ;let nearby-leaders turtles with [leader] and (distance myself < 30)] ;; find nearby leaders
+  ;if any? nearby-leaders [ ;; to avoid 'nobody'-error, check if there are any first
+    ;face min-one-of nearby-leaders [distance myself] ;; then face the one closest to myself
+    ;fd 1
+  ;]
 end
 
+;; @**********@ agent method @**********@ ;;
 to exploit
   set color green
 
@@ -211,6 +240,7 @@ to exploit
     ;; If we got to the nest -> unload food and restart searching
     ifelse nest? [
       set loaded? false
+      ;;ask ants in-radius 4 [ set state "following" ]
       set state "searching"
       stop
     ] [
@@ -224,46 +254,73 @@ to exploit
       set food? false
       set loaded? true
     ]
-
     ;; Is there the scent of food? -> move towards higher concentrations of it
-    if food-scent > 0.1 [
-      uphill food-scent
-    ]
+      if food-scent > 0.1
+      [ uphill food-scent ]
   ]
 
 end
 
+;; @**********@ agent method @**********@ ;;
 to recruit
+  ;; here the mechanical recruitment (carry and tandem-->follow) should be implementes
+  ;; also a chemical recruitment when a big food source is found asking for other ants help to move the food piece
   stop
 end
 
-to update-ant-state
-  stop
+;; @**********@ agent method @**********@ ;;
+to join-chemical
+  let scent-ahead chemical-scent-at-angle   0
+  let scent-right chemical-scent-at-angle  45
+  let scent-left  chemical-scent-at-angle -45
+  if (scent-right > scent-ahead) or (scent-left > scent-ahead)
+  [ ifelse scent-right > scent-left
+    [ rt 45 ]
+    [ lt 45 ] ]
+end
+
+;; @**********@ patch procedure @**********@ ;;
+to-report chemical-scent-at-angle [angle]
+  let p patch-right-and-ahead angle 1
+  if p = nobody [ report 0 ]
+  report [chemical] of p
 end
 
 
+;; @**********@ agent method @**********@ ;;
 to wiggle  ;; turtle procedure
   ;; Move with less variability when getting out of the nest
-  let max_angle per_step_max_rotation / (1 + (exp (-0.1 * (steps - (per_step_max_rotation / 2))) ) )
-  let ranright random max_angle
-  let ranleft random max_angle
+  ;;let max_angle per_step_max_rotation / (1 + (exp (-0.1 * (steps - (per_step_max_rotation / 2))) ) )
+  let ranright random 40
+  let ranleft random 40
   let delta ranright - ranleft
   rt delta
   if not can-move? 1
   [ rt 180 ]
 end
 
+;; @**********@ agent method @**********@ ;;
 to return-to-nest
   set chemical chemical + 60
-  wiggle
+  ;; this is to say that the ant has memory of nest location so it heads toward the next to return
+  ;; this method should be canged for a path integration method
+  facexy nest-xcor nest-ycor
   fd 1
+end
+
+;; @**********@ agent method @**********@ ;;
+to go-last-food-source
+  ifelse (distancexy food-x food-y) > 1
+  [facexy food-x food-y ;; if i remember where i found food I turn in food direction.
+    fd 1]
+  [set f-memory false]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
 10
-1423
-1224
+1023
+824
 -1
 -1
 5.0
@@ -276,10 +333,10 @@ GRAPHICS-WINDOW
 0
 0
 1
--120
-120
--120
-120
+-80
+80
+-80
+80
 1
 1
 1
@@ -295,7 +352,7 @@ population
 population
 1
 50
-6.0
+39.0
 1
 1
 NIL
@@ -344,7 +401,7 @@ diffusion-rate
 diffusion-rate
 0.0
 99.0
-28.0
+15.0
 1.0
 1
 NIL
@@ -358,8 +415,8 @@ SLIDER
 food-sources
 food-sources
 0
-2000
-13.0
+50
+4.0
 1
 1
 NIL
@@ -367,14 +424,14 @@ HORIZONTAL
 
 SLIDER
 26
-1092
+607
 198
-1125
+640
 ran-seed
 ran-seed
 0
 10000
-1975.0
+2930.0
 1
 1
 NIL
@@ -389,7 +446,7 @@ max-food-size
 max-food-size
 1
 50
-22.0
+6.0
 1
 1
 NIL
@@ -404,7 +461,7 @@ evaporation-rate
 evaporation-rate
 0
 10
-2.0
+4.0
 1
 1
 NIL
@@ -426,10 +483,10 @@ NIL
 HORIZONTAL
 
 SWITCH
-27
-1141
-130
-1174
+58
+661
+161
+694
 trace?
 trace?
 0
