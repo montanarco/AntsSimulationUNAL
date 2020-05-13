@@ -8,6 +8,7 @@ breed [ants ant]        ;; ants breed is declared
 ants-own [              ;; ant atributes
   state
   loaded?               ;; this informs if the ant is or not carring food
+  load-type             ;; type of food being transported by the ant
   steps                 ;; number of steps the ant do to after leaving the nest and until it find a food location
   fullness              ;; this variable measures if the ant feels hungry, so it can start looking for food
   food-x                ;; the x coordinate where the ant found food the last time
@@ -18,7 +19,8 @@ ants-own [              ;; ant atributes
 
 patches-own [
   chemical             ;; amount of chemical on this patch
-  food?                ;; amount of food on this patch (0, 1, or 2)
+  food?                ;; is there food on this patch?
+  food-type            ;; type of food in this patch if any - 0: none - 1: seed - 2: bug - 3: leaves - 4 : honeydew
   nest?                ;; true on nest patches, false elsewhere
   nest-scent           ;; number that is higher closer to the nest
   food-scent           ;; the smell a food source produces in the neigbors around
@@ -58,7 +60,10 @@ to setup-patches
     set nest? false
     set food-scent 0
   ]
-  setup-food-sources
+  setup-food-sources 1 seeds
+  setup-food-sources 2 bugs
+  setup-food-sources 3 leaves
+  setup-food-sources 4 honeydew
   ask patches [
     setup-nest nest-xcor nest-ycor ;; Place the nest at a random point
     recolor-patch ;; Color all the patches depending if they are food source or nest
@@ -74,18 +79,19 @@ to setup-nest [patch-xcor patch-pycor]
 end
 
 ;; Sets the number of food sources indicated by the food-sources slider
-to setup-food-sources
-  repeat food-sources [
+to setup-food-sources [ftype number-of-sources]
+  repeat number-of-sources [
     ;; Get center for new patch
     let x-coord random-location min-pxcor max-pxcor
     let y-coord random-location min-pycor max-pycor
-    let food-size random max-food-size
+    let food-size ftype
 
     ;; Get the patch for the center of the food source
     ask patch x-coord y-coord [
       ;; Find the patches around the center and set them as food
       ask patches in-radius food-size [
-        set food? food? OR (distancexy x-coord y-coord) <= food-size ;; This condition is required to make sources round, can be replaced with true
+        set food-type ftype
+        set food? food? OR (distancexy x-coord y-coord) < food-size ;; This condition is required to make sources round, can be replaced with true
       ]
     ]
   ]
@@ -96,9 +102,12 @@ end
 to recolor-patch
   ifelse nest?
   [ set pcolor violet ]
-  [ifelse food?
-    [ set pcolor sky  ]
-    [
+  [ifelse food? [
+      if food-type = 1 [ set pcolor orange ] ;; seed
+      if food-type = 2 [ set pcolor brown ] ;; bug
+      if food-type = 3 [ set pcolor green ] ;; leaves
+      if food-type = 4 [ set pcolor yellow ] ;; honeydew
+    ] [
       ;; If there is food-scent, show it
       set pcolor scale-color pink food-scent 0.1 20
       ;; If there is a trace of pheromone show it
@@ -352,7 +361,7 @@ population
 population
 1
 50
-39.0
+50.0
 1
 1
 NIL
@@ -401,23 +410,8 @@ diffusion-rate
 diffusion-rate
 0.0
 99.0
-15.0
+10.0
 1.0
-1
-NIL
-HORIZONTAL
-
-SLIDER
-21
-370
-193
-403
-food-sources
-food-sources
-0
-50
-4.0
-1
 1
 NIL
 HORIZONTAL
@@ -438,21 +432,6 @@ NIL
 HORIZONTAL
 
 SLIDER
-22
-420
-194
-453
-max-food-size
-max-food-size
-1
-50
-6.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
 25
 197
 197
@@ -461,7 +440,7 @@ evaporation-rate
 evaporation-rate
 0
 10
-4.0
+2.0
 1
 1
 NIL
@@ -489,7 +468,7 @@ SWITCH
 694
 trace?
 trace?
-0
+1
 1
 -1000
 
@@ -504,6 +483,66 @@ max_fullness
 200
 190.0
 5
+1
+NIL
+HORIZONTAL
+
+SLIDER
+1064
+21
+1236
+54
+seeds
+seeds
+0
+200
+50.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+1066
+70
+1238
+103
+bugs
+bugs
+0
+100
+10.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+1067
+120
+1239
+153
+leaves
+leaves
+0
+100
+10.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+1068
+168
+1240
+201
+honeydew
+honeydew
+0
+20
+3.0
+1
 1
 NIL
 HORIZONTAL
