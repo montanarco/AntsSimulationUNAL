@@ -47,7 +47,8 @@ to setup
     set loaded? false
     set fullness random max_fullness
     set f-memory false
-    ;;if trace? [ pen-down ]
+    set load-type 0
+    if trace? [ pen-down ]
   ]
   setup-patches
   reset-ticks
@@ -262,6 +263,7 @@ to exploit
     if food? [
       set food? false
       set loaded? true
+      set load-type food-type
     ]
     ;; Is there the scent of food? -> move towards higher concentrations of it
       if food-scent > 0.1
@@ -310,7 +312,9 @@ end
 
 ;; @**********@ agent method @**********@ ;;
 to return-to-nest
-  set chemical chemical + 60
+  if load-type > 1 [ ;; if we are harvesting seeds there is no need to leave a pheromene trail
+    set chemical chemical + 60
+  ]
   ;; this is to say that the ant has memory of nest location so it heads toward the next to return
   ;; this method should be canged for a path integration method
   facexy nest-xcor nest-ycor
@@ -319,9 +323,9 @@ end
 
 ;; @**********@ agent method @**********@ ;;
 to go-last-food-source
-  ifelse (distancexy food-x food-y) > 1
-  [facexy food-x food-y ;; if i remember where i found food I turn in food direction.
-    fd 1]
+  ifelse (distancexy food-x food-y) > 1  [
+    facexy food-x food-y ;; if i remember where i found food I turn in food direction.
+  ]
   [set f-memory false]
 end
 @#$#@#$#@
@@ -425,7 +429,7 @@ ran-seed
 ran-seed
 0
 10000
-2930.0
+7197.0
 1
 1
 NIL
