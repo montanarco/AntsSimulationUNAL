@@ -10,7 +10,10 @@ ants-own [              ;; ant atributes
   loaded?               ;; this informs if the ant is or not carring food
   load-type             ;; type of food being transported by the ant
   steps                 ;; number of steps the ant do to after leaving the nest and until it find a food location
+  location
+  loss-count            ;; this variable determines when an ant is lost
   fullness              ;; this variable measures if the ant feels hungry, so it can start looking for food
+  food
   food-x                ;; the x coordinate where the ant found food the last time
   food-y                ;; the y coordinate where the ant found food the last time
   f-memory              ;; indicate if the ant have found any food source
@@ -29,7 +32,7 @@ patches-own [
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Setup procedures ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;
-
+	
 to setup
   clear-all
   set-default-shape ants "bug"
@@ -47,6 +50,7 @@ to setup
     set loaded? false
     set fullness random max_fullness
     set f-memory false
+    set leader false
     set load-type 0
     if trace? [ pen-down ]
   ]
@@ -54,7 +58,7 @@ to setup
   reset-ticks
 end
 
-to setup-patches
+	to setup-patches
   ask patches [
     ;; Initialize patches as not being food or nest
     set food? false
@@ -71,22 +75,21 @@ to setup-patches
   ]
 end
 
-to setup-nest [patch-xcor patch-pycor]
-  set nest? (distancexy patch-xcor patch-pycor) < 5
-  if nest? [
-    ;; If this is part of the nest, disable food sources
-    set food? false
-  ]
+to setup-nest [patch-xcor patch-pycor]	
+  set nest? (distancexy patch-xcor patch-pycor) < 5	
+  if nest? [	
+    ;; If this is part of the nest, disable food sources	
+    set food? false	
+  ]	
 end
 
-;; Sets the number of food sources indicated by the food-sources slider
+	;; Sets the number of food sources indicated by the food-sources slider
 to setup-food-sources [ftype number-of-sources]
   repeat number-of-sources [
     ;; Get center for new patch
     let x-coord random-location min-pxcor max-pxcor
     let y-coord random-location min-pycor max-pycor
     let food-size ftype
-
     ;; Get the patch for the center of the food source
     ask patch x-coord y-coord [
       ;; Find the patches around the center and set them as food
@@ -96,10 +99,9 @@ to setup-food-sources [ftype number-of-sources]
       ]
     ]
   ]
-
 end
 
-;; @**********@ patch procedure @**********@ ;;
+	;; @**********@ patch procedure @**********@ ;;
 to recolor-patch
   ifelse nest?
   [ set pcolor violet ]
@@ -119,16 +121,16 @@ to recolor-patch
   ]
 end
 
-;; @**********@ patch procedure @**********@ ;;
+	;; @**********@ patch procedure @**********@ ;;
 to-report random-location [minvalue maxvalue]
-  let location (random maxvalue) * ((-1) ^ one-of[1 2])
-  if (location >= (maxvalue - 10)) [
-  report location - 10
+  let locationPat (random maxvalue) * ((-1) ^ one-of[1 2])
+  if (locationPat >= (maxvalue - 10)) [
+  report locationPat - 10
   ]
-  if (location <= (maxvalue + 10)) [
-  report location + 10
+  if (locationPat <= (maxvalue + 10)) [
+  report locationPat + 10
   ]
-  report location
+  report locationPat
 end
 
 ;;;;;;;;;;;;;;;;;;;;;
@@ -186,7 +188,7 @@ to hold
   stop
 end
 
-;; @**********@ agent method @**********@ ;;
+	;; @**********@ agent method @**********@ ;;
 to search
   set color red
   ;; Food has been found, proceed to exploiting state
@@ -200,13 +202,11 @@ to search
   [
     set steps 1
     set heading random 360
-    fd 1
   ]
   [
     ;; when the ant remembers a location where it has found any food, it goes back to check if there is more
     ifelse f-memory
-    [ set leader true
-      go-last-food-source
+    [ go-last-food-source
     ]
     [
     ;; Otherwise just search at random
@@ -214,7 +214,6 @@ to search
        [join-chemical]
        [wiggle]
     ]
-
   ]
   fd 1
   set steps steps + 1
@@ -228,48 +227,58 @@ to record-food-location
   set food-y ycor
 end
 
-;; @**********@ agent method @**********@ ;;
-to follow-ant
- if loaded?
-  [ set state "searching"
-    stop]
-
-  ;let nearby-leaders turtles with [leader] and (distance myself < 30)] ;; find nearby leaders
-  ;if any? nearby-leaders [ ;; to avoid 'nobody'-error, check if there are any first
-    ;face min-one-of nearby-leaders [distance myself] ;; then face the one closest to myself
-    ;fd 1
-  ;]
+	;; @**********@ agent method @**********@ ;;	
+to follow-ant	
+  set color yellow	
+ if loaded?	
+  [ set state "searching"	
+    stop]	
+  let nearby-leaders turtles with [leader and (distance myself < 20)] ;; find nearby leaders	
+  ifelse any? nearby-leaders [ ;; to avoid 'nobody'-error, check if there are any first	
+    face min-one-of nearby-leaders [distance myself] ;; then face the one closest to myself	
+    if not can-move? 1
+    [ rt random 180 ]
+    fd 1	
+    set loss-count 0	
+  ]	
+  [	
+    set loss-count loss-count + 1	
+    if(loss-count > 100)	
+    [set state "searching"	
+     set loss-count 0	
+    ] ;; if i was following some one but i dont see him for a period y go searching again	
+  ]	
 end
 
-;; @**********@ agent method @**********@ ;;
-to exploit
-  set color green
-
-  ifelse loaded? [
-    ;; we have food, lets get it to the nest
-    ;; If we got to the nest -> unload food and restart searching
-    ifelse nest? [
-      set loaded? false
-      ;;ask ants in-radius 4 [ set state "following" ]
-      set state "searching"
-      stop
-    ] [
-      ;; Otherwise try to get to the nest
-      return-to-nest
-    ]
-  ] [
-    ;; We are not loaded, so we should try to grab food
-    ;; Is there food? ->  Grab it
-    if food? [
-      set food? false
-      set loaded? true
+	;; @**********@ agent method @**********@ ;;	
+to exploit	
+  set color green	
+  ifelse loaded? [	
+    ;; we have food, lets get it to the nest	
+    ;; If we got to the nest -> unload food and restart searching	
+    ifelse nest? [	
+      set loaded? false	
+      ;; when the ant remembers a location where it has found any food, call others to show where the food source is	
+      set leader true	
+      ask ants in-radius 4 [ set state "following" ]	
+      set state "searching"	
+      stop	
+    ] [	
+      ;; Otherwise try to get to the nest	
+      return-to-nest	
+    ]	
+  ] [	
+    ;; We are not loaded, so we should try to grab food	
+    ;; Is there food? ->  Grab it	
+    if food? [	
+      set food? false	
+      set loaded? true	
       set load-type food-type
-    ]
-    ;; Is there the scent of food? -> move towards higher concentrations of it
-      if food-scent > 0.1
-      [ uphill food-scent ]
-  ]
-
+    ]	
+    ;; Is there the scent of food? -> move towards higher concentrations of it	
+      if food-scent > 0.1	
+      [ uphill food-scent ]	
+  ]	
 end
 
 ;; @**********@ agent method @**********@ ;;
@@ -314,25 +323,35 @@ end
 to return-to-nest
   if load-type > 1 [ ;; if we are harvesting seeds there is no need to leave a pheromene trail
     set chemical chemical + 60
+    set leader false
   ]
   ;; this is to say that the ant has memory of nest location so it heads toward the next to return
   ;; this method should be canged for a path integration method
   facexy nest-xcor nest-ycor
+  if not can-move? 1
+  [ rt 180 ]
   fd 1
 end
 
-;; @**********@ agent method @**********@ ;;
-to go-last-food-source
-  ifelse (distancexy food-x food-y) > 1  [
-    facexy food-x food-y ;; if i remember where i found food I turn in food direction.
-  ]
-  [set f-memory false]
+	;; @**********@ agent method @**********@ ;;	
+to go-last-food-source	
+  ifelse (distancexy food-x food-y) > 1	
+  [	
+    facexy food-x food-y ;; if i remember where i found food I turn in food direction.	
+    if not can-move? 1
+    [ rt random 180 ]
+  ]	
+  [	
+    set f-memory false	
+    set leader false
+    ask ants in-radius 10 [ set state "searching" ]	
+  ]	
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-210
+350
 10
-1023
+1163
 824
 -1
 -1
@@ -477,10 +496,10 @@ trace?
 -1000
 
 SLIDER
-24
-460
-196
-493
+25
+564
+197
+597
 max_fullness
 max_fullness
 0
@@ -492,54 +511,54 @@ NIL
 HORIZONTAL
 
 SLIDER
-1064
+1204
 21
-1236
+1376
 54
 seeds
 seeds
 0
 200
-50.0
+13.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-1066
+1206
 70
-1238
+1378
 103
 bugs
 bugs
 0
 100
-10.0
+8.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-1067
+1207
 120
-1239
+1379
 153
 leaves
 leaves
 0
 100
-10.0
+9.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-1068
+1208
 168
-1240
+1380
 201
 honeydew
 honeydew
@@ -550,6 +569,28 @@ honeydew
 1
 NIL
 HORIZONTAL
+
+PLOT
+24
+301
+302
+521
+Ants by State
+NIL
+NIL
+0.0
+80.0
+0.0
+50.0
+true
+true
+"" ""
+PENS
+"waiting" 1.0 0 -16777216 true "" "plotxy ticks count turtles with [state = \"waiting\"]"
+"searching" 1.0 0 -2674135 true "" "plotxy ticks count turtles with [state = \"searching\"]"
+"following" 1.0 0 -1184463 true "" "plotxy ticks count turtles with [state = \"following\"]"
+"exploiting" 1.0 0 -13840069 true "" "plotxy ticks count turtles with [state = \"exploiting\"]"
+"recruiting" 1.0 0 -2382653 true "" "plotxy ticks count turtles with [state = \"recruiting\"]"
 
 @#$#@#$#@
 ## WHAT IS IT?
