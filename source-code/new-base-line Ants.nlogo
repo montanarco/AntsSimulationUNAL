@@ -2,7 +2,12 @@
 extensions [array]
 
 ;;globals
-globals [nest-xcor nest-ycor]
+globals [
+  nest-xcor
+  nest-ycor
+  pheromones-diffusion
+  pheromones-evaporation
+]
 breed [ants ant]        ;; ants breed is declared
 
 ants-own [              ;; ant atributes
@@ -21,7 +26,7 @@ ants-own [              ;; ant atributes
 ]
 
 patches-own [
-  chemical             ;; amount of chemical on this patch
+  chemical-return      ;; amount of chemical on this patch
   food?                ;; is there food on this patch?
   food-type            ;; type of food in this patch if any - 0: none - 1: seed - 2: bug - 3: leaves - 4 : honeydew
   nest?                ;; true on nest patches, false elsewhere
@@ -58,7 +63,7 @@ to setup
   reset-ticks
 end
 
-	to setup-patches
+to setup-patches
   ask patches [
     ;; Initialize patches as not being food or nest
     set food? false
@@ -81,6 +86,11 @@ to setup-nest [patch-xcor patch-pycor]
     ;; If this is part of the nest, disable food sources	
     set food? false	
   ]	
+end
+
+to setup-pheromones
+  set pheromones-diffusion read-from-string pheromone-diffusion-rates
+  set pheromones-evaporation read-from-string pheromone-evaporation-rates
 end
 
 	;; Sets the number of food sources indicated by the food-sources slider
@@ -114,8 +124,8 @@ to recolor-patch
       ;; If there is food-scent, show it
       set pcolor scale-color pink food-scent 0.1 20
       ;; If there is a trace of pheromone show it
-      if chemical > 0.1 [
-        set pcolor scale-color green chemical 0.01 5
+      if chemical-return > 0.1 [
+        set pcolor scale-color green chemical-return 0.01 5
       ]
     ]
   ]
@@ -149,6 +159,7 @@ to go
   if (state = "recruiting" ) [recruit]
   ]
 
+  setup-pheromones
   diffuse-chemical
 
   ;; Add the food-scent
@@ -162,9 +173,9 @@ end
 
 ;; @**********@ patch procedure @**********@ ;;
 to diffuse-chemical
- diffuse chemical (diffusion-rate / 100)
+  diffuse chemical-return ((diffusion pheromone-return)/ 100)
   ask patches [
-    set chemical chemical * (100 - evaporation-rate) / 100  ;; slowly evaporate chemical
+    set chemical-return chemical-return * (100 - (evaporation pheromone-return)) / 100  ;; slowly evaporate chemical
     recolor-patch
     ;; We need to lower the general level of food-scent since we are adding more constantly
     set food-scent food-scent / 1.1
@@ -210,7 +221,7 @@ to search
     ]
     [
     ;; Otherwise just search at random
-    ifelse (chemical >= 0.05) and (chemical < 2)    ;; original mecanism of pheromone following
+    ifelse (chemical-return >= 0.05) and (chemical-return < 2)    ;; original mecanism of pheromone following
        [join-chemical]
        [wiggle]
     ]
@@ -303,7 +314,7 @@ end
 to-report chemical-scent-at-angle [angle]
   let p patch-right-and-ahead angle 1
   if p = nobody [ report 0 ]
-  report [chemical] of p
+  report [chemical-return] of p
 end
 
 
@@ -322,7 +333,7 @@ end
 ;; @**********@ agent method @**********@ ;;
 to return-to-nest
   if load-type > 1 [ ;; if we are harvesting seeds there is no need to leave a pheromene trail
-    set chemical chemical + 60
+    set chemical-return chemical-return + 60
     set leader false
   ]
   ;; this is to say that the ant has memory of nest location so it heads toward the next to return
@@ -346,6 +357,17 @@ to go-last-food-source
     set leader false
     ask ants in-radius 10 [ set state "searching" ]	
   ]	
+end
+
+;; @**********@ Pheromones helper methods @**********@ ;;	
+to-report evaporation [pheromone]
+  ;; gets the evaporation rate for the pheromone index
+  report item (pheromone - 1) pheromones-evaporation
+end
+
+to-report diffusion [pheromone]
+  ;; gets the diffusion rate for the pheromone index
+  report item (pheromone - 1) pheromones-diffusion
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -425,21 +447,6 @@ NIL
 1
 
 SLIDER
-24
-151
-196
-184
-diffusion-rate
-diffusion-rate
-0.0
-99.0
-10.0
-1.0
-1
-NIL
-HORIZONTAL
-
-SLIDER
 26
 607
 198
@@ -449,21 +456,6 @@ ran-seed
 0
 10000
 7197.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-25
-197
-197
-230
-evaporation-rate
-evaporation-rate
-0
-10
-2.0
 1
 1
 NIL
@@ -512,9 +504,9 @@ HORIZONTAL
 
 SLIDER
 1204
-21
+50
 1376
-54
+83
 seeds
 seeds
 0
@@ -527,14 +519,14 @@ HORIZONTAL
 
 SLIDER
 1206
-70
+99
 1378
-103
+132
 bugs
 bugs
 0
 100
-8.0
+9.0
 1
 1
 NIL
@@ -542,9 +534,9 @@ HORIZONTAL
 
 SLIDER
 1207
-120
+149
 1379
-153
+182
 leaves
 leaves
 0
@@ -557,9 +549,9 @@ HORIZONTAL
 
 SLIDER
 1208
-168
+197
 1380
-201
+230
 honeydew
 honeydew
 0
@@ -591,6 +583,58 @@ PENS
 "following" 1.0 0 -1184463 true "" "plotxy ticks count turtles with [state = \"following\"]"
 "exploiting" 1.0 0 -13840069 true "" "plotxy ticks count turtles with [state = \"exploiting\"]"
 "recruiting" 1.0 0 -2382653 true "" "plotxy ticks count turtles with [state = \"recruiting\"]"
+
+TEXTBOX
+1191
+27
+1341
+45
+Food sources
+11
+0.0
+1
+
+TEXTBOX
+1194
+261
+1344
+279
+Pheromones
+11
+0.0
+1
+
+INPUTBOX
+1204
+286
+1479
+346
+pheromone-diffusion-rates
+[ 2 5 100 ]
+1
+0
+String
+
+INPUTBOX
+1204
+358
+1475
+418
+pheromone-evaporation-rates
+[ 5 20 20 ]
+1
+0
+String
+
+CHOOSER
+1205
+433
+1343
+478
+pheromone-return
+pheromone-return
+1 2 3
+0
 
 @#$#@#$#@
 ## WHAT IS IT?
