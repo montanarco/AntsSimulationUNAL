@@ -7,6 +7,7 @@ globals [
   nest-ycor
   pheromones-diffusion
   pheromones-evaporation
+  pheromones-help-evaporation
 ]
 breed [ants ant]        ;; ants breed is declared
 
@@ -23,10 +24,13 @@ ants-own [              ;; ant atributes
   food-y                ;; the y coordinate where the ant found food the last time
   f-memory              ;; indicate if the ant have found any food source
   leader                ;; use to indicate other ants to follow self to be guided to the food source
+  bug-size
+  bug-leader
 ]
 
 patches-own [
   chemical-return      ;; amount of chemical on this patch
+  pheromone-recruit       ;; a type of pheromone that is droped when help to carry big food source is requiered
   food?                ;; is there food on this patch?
   food-type            ;; type of food in this patch if any - 0: none - 1: seed - 2: bug - 3: leaves - 4 : honeydew
   nest?                ;; true on nest patches, false elsewhere
@@ -56,6 +60,7 @@ to setup
     set fullness random max_fullness
     set f-memory false
     set leader false
+    set bug-leader false
     set load-type 0
     if trace? [ pen-down ]
   ]
@@ -91,6 +96,7 @@ end
 to setup-pheromones
   set pheromones-diffusion read-from-string pheromone-diffusion-rates
   set pheromones-evaporation read-from-string pheromone-evaporation-rates
+  set pheromones-help-evaporation 5
 end
 
 	;; Sets the number of food sources indicated by the food-sources slider
@@ -99,7 +105,7 @@ to setup-food-sources [ftype number-of-sources]
     ;; Get center for new patch
     let x-coord random-location min-pxcor max-pxcor
     let y-coord random-location min-pycor max-pycor
-    let food-size ftype
+    let food-size ftype ;* (random 3) + 1
     ;; Get the patch for the center of the food source
     ask patch x-coord y-coord [
       ;; Find the patches around the center and set them as food
@@ -126,6 +132,10 @@ to recolor-patch
       ;; If there is a trace of pheromone show it
       if chemical-return > 0.1 [
         set pcolor scale-color green chemical-return 0.01 5
+      ]
+
+    if pheromone-recruit > 0.1 [
+        set pcolor scale-color brown pheromone-recruit 0.01 5
       ]
     ]
   ]
@@ -156,11 +166,13 @@ to go
   if (state = "searching" ) [search]
   if (state = "following" ) [follow-ant]
   if (state = "exploiting" ) [exploit]
+  if (state = "exploit-bug" ) [exploiting-bug]
   if (state = "recruiting" ) [recruit]
   ]
 
   setup-pheromones
   diffuse-chemical
+  diffuse-pheromones
 
   ;; Add the food-scent
   ask patches with [food?] [
@@ -176,6 +188,16 @@ to diffuse-chemical
   diffuse chemical-return ((diffusion pheromone-return)/ 100)
   ask patches [
     set chemical-return chemical-return * (100 - (evaporation pheromone-return)) / 100  ;; slowly evaporate chemical
+    ;; We need to lower the general level of food-scent since we are adding more constantly
+    set food-scent food-scent / 1.1
+  ]
+end
+
+;; @**********@ patch procedure @**********@ ;;
+to diffuse-pheromones
+  diffuse pheromone-recruit ((pheromones-help-evaporation)/ 100)
+  ask patches [
+    set pheromone-recruit pheromone-recruit * (100 - (pheromones-help-evaporation)) / 100  ;; slowly evaporate chemical
     recolor-patch
     ;; We need to lower the general level of food-scent since we are adding more constantly
     set food-scent food-scent / 1.1
@@ -221,9 +243,13 @@ to search
     ]
     [
     ;; Otherwise just search at random
-    ifelse (chemical-return >= 0.05) and (chemical-return < 2)    ;; original mecanism of pheromone following
-       [join-chemical]
-       [wiggle]
+    ifelse (pheromone-recruit >= 0.05) and (pheromone-recruit < 2)    ;; original mecanism of pheromone following
+       [join-chemical "pheromone"]
+       [
+         ifelse (chemical-return >= 0.05) and (chemical-return < 2)    ;; original mecanism of pheromone following
+            [join-chemical "chemical"]
+            [wiggle]
+       ]
     ]
   ]
   fd 1
@@ -241,23 +267,21 @@ end
 	;; @**********@ agent method @**********@ ;;	
 to follow-ant	
   set color yellow	
- if loaded?	
-  [ set state "searching"	
+  if loaded?	
+  [ set state "exploiting"	
     stop]	
   let nearby-leaders turtles with [leader and (distance myself < 20)] ;; find nearby leaders	
-  ifelse any? nearby-leaders [ ;; to avoid 'nobody'-error, check if there are any first	
+  if any? nearby-leaders [ ;; to avoid 'nobody'-error, check if there are any first	
     face min-one-of nearby-leaders [distance myself] ;; then face the one closest to myself	
     if not can-move? 1
     [ rt random 180 ]
     fd 1	
-    set loss-count 0	
-  ]	
-  [	
+
     set loss-count loss-count + 1	
-    if(loss-count > 100)	
+    if(loss-count > 500)	
     [set state "searching"	
      set loss-count 0	
-    ] ;; if i was following some one but i dont see him for a period y go searching again	
+    ] ;; if i was following some one but i dont see him for a period i rather go searching again	
   ]	
 end
 
@@ -271,7 +295,9 @@ to exploit
       set loaded? false	
       ;; when the ant remembers a location where it has found any food, call others to show where the food source is	
       set leader true	
-      ask ants in-radius 4 [ set state "following" ]	
+      ask ants in-radius 3 [ set state "following" ]	
+      ;let turtleNum one-of ants in-radius 4
+      ;create-links-to turtleNum ;n-of 4 other turtles
       set state "searching"	
       stop	
     ] [	
@@ -282,9 +308,17 @@ to exploit
     ;; We are not loaded, so we should try to grab food	
     ;; Is there food? ->  Grab it	
     if food? [	
+      ifelse (food-type = 2)
+      [
+      record-food-location
+      set bug-size measure-bug          ;; see how many comrades would be needed to carry th bug
+      set state "recruiting"
+      stop
+      ][
       set food? false	
       set loaded? true	
       set load-type food-type
+      ]
     ]	
     ;; Is there the scent of food? -> move towards higher concentrations of it	
       if food-scent > 0.1	
@@ -292,18 +326,64 @@ to exploit
   ]	
 end
 
-;; @**********@ agent method @**********@ ;;
-to recruit
-  ;; here the mechanical recruitment (carry and tandem-->follow) should be implementes
-  ;; also a chemical recruitment when a big food source is found asking for other ants help to move the food piece
-  stop
+to-report measure-bug
+  let inrad5 patches in-radius 5
+  report count patches with [ member? self inrad5 and pcolor = brown ]
 end
 
 ;; @**********@ agent method @**********@ ;;
-to join-chemical
-  let scent-ahead chemical-scent-at-angle   0
-  let scent-right chemical-scent-at-angle  45
-  let scent-left  chemical-scent-at-angle -45
+to recruit
+  let comrades count ants with [state = "recruiting"] in-radius 12
+  ifelse (comrades >  (bug-size / 2))
+  [
+    ask ants with [state = "recruiting"] in-radius 12 [set state "exploit-bug" ]
+    ifelse (distancexy food-x food-y) > 0
+    [find-bug-source]
+    [set bug-leader true]
+  ][
+   set pheromone-recruit pheromone-recruit + 100
+    recruit-circles
+    fd 1
+  ]
+  stop
+end
+
+to exploiting-bug
+  set color brown
+   ifelse bug-leader [
+    ask patches with [food? and food-type = 2] in-radius 10 [
+      set food? false
+      set food-type 0
+    ]
+    ask patches in-radius 2 [
+      set food? true
+      set food-type 2
+    ]
+    ifelse nest? [
+      set bug-leader false
+      ask patches with [food? and food-type = 2] in-radius 8 [
+      set food? false
+      set food-type 0
+      ]
+      set state "searching"
+    ]
+    [ return-to-nest ]
+  ]
+  [ return-to-nest ]
+end
+
+	;; @**********@ agent method @**********@ ;;	
+to find-bug-source	
+    facexy food-x food-y ;; if i remember where i found food I turn in food direction.	
+    if not can-move? 1
+    [ rt random 180 ]
+end
+
+;; @**********@ agent method @**********@ ;;
+to join-chemical [kind]
+  let scent-ahead chemical-scent-at-angle   0  kind
+  let scent-right chemical-scent-at-angle  45  kind
+  let scent-left  chemical-scent-at-angle -45  kind
   if (scent-right > scent-ahead) or (scent-left > scent-ahead)
   [ ifelse scent-right > scent-left
     [ rt 45 ]
@@ -311,12 +391,16 @@ to join-chemical
 end
 
 ;; @**********@ patch procedure @**********@ ;;
-to-report chemical-scent-at-angle [angle]
+to-report chemical-scent-at-angle [angle kind]
   let p patch-right-and-ahead angle 1
   if p = nobody [ report 0 ]
-  report [chemical-return] of p
+  if (kind = "pheromone")[
+     report [pheromone-recruit] of p
+  ]
+  if (kind = "chemical")[
+     report [chemical-return] of p
+  ]
 end
-
 
 ;; @**********@ agent method @**********@ ;;
 to wiggle  ;; turtle procedure
@@ -330,9 +414,22 @@ to wiggle  ;; turtle procedure
   [ rt 180 ]
 end
 
+
+to recruit-circles
+  rt 15
+  if not can-move? 1
+  [ rt 180 ]
+
+  set loss-count loss-count + 1	
+  if(loss-count > 100)	
+  [set state "searching"	
+     set loss-count 0	
+  ] ;; if i was following some one but i dont see him for a period i rather go searching again	
+end
+
 ;; @**********@ agent method @**********@ ;;
 to return-to-nest
-  if load-type > 1 [ ;; if we are harvesting seeds there is no need to leave a pheromene trail
+  if load-type > 2 [ ;; if we are harvesting seeds or bug there is no need to leave a pheromene trail
     set chemical-return chemical-return + 60
     set leader false
   ]
@@ -358,6 +455,7 @@ to go-last-food-source
     ask ants in-radius 10 [ set state "searching" ]	
   ]	
 end
+
 
 ;; @**********@ Pheromones helper methods @**********@ ;;	
 to-report evaporation [pheromone]
@@ -405,8 +503,8 @@ SLIDER
 population
 population
 1
-50
-50.0
+100
+100.0
 1
 1
 NIL
@@ -455,7 +553,7 @@ ran-seed
 ran-seed
 0
 10000
-7197.0
+6112.0
 1
 1
 NIL
@@ -470,7 +568,7 @@ per_step_max_rotation
 per_step_max_rotation
 0
 180
-50.0
+60.0
 5
 1
 NIL
@@ -526,7 +624,7 @@ bugs
 bugs
 0
 100
-9.0
+6.0
 1
 1
 NIL
@@ -582,7 +680,7 @@ PENS
 "searching" 1.0 0 -2674135 true "" "plotxy ticks count turtles with [state = \"searching\"]"
 "following" 1.0 0 -1184463 true "" "plotxy ticks count turtles with [state = \"following\"]"
 "exploiting" 1.0 0 -13840069 true "" "plotxy ticks count turtles with [state = \"exploiting\"]"
-"recruiting" 1.0 0 -2382653 true "" "plotxy ticks count turtles with [state = \"recruiting\"]"
+"recruiting" 1.0 0 -5207188 true "" "plotxy ticks count turtles with [state = \"recruiting\" or state = \"exploit-bug\"]"
 
 TEXTBOX
 1191
@@ -634,7 +732,7 @@ CHOOSER
 pheromone-return
 pheromone-return
 1 2 3
-0
+2
 
 @#$#@#$#@
 ## WHAT IS IT?
