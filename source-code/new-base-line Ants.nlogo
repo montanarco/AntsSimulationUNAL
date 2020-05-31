@@ -75,10 +75,10 @@ to setup-patches
     set nest? false
     set food-scent 0
   ]
-  setup-food-sources 1 seeds
-  setup-food-sources 2 bugs
-  setup-food-sources 3 leaves
-  setup-food-sources 4 honeydew
+  spawn-food-sources 1 seeds 1
+  spawn-food-sources 2 bugs 1
+  spawn-food-sources 3 dead-bugs 1
+  spawn-food-sources 4 honeydew 1
   ask patches [
     setup-nest nest-xcor nest-ycor ;; Place the nest at a random point
     recolor-patch ;; Color all the patches depending if they are food source or nest
@@ -100,18 +100,26 @@ to setup-pheromones
 end
 
 	;; Sets the number of food sources indicated by the food-sources slider
-to setup-food-sources [ftype number-of-sources]
-  repeat number-of-sources [
-    ;; Get center for new patch
-    let x-coord random-location min-pxcor max-pxcor
-    let y-coord random-location min-pycor max-pycor
-    let food-size ftype ;* (random 3) + 1
-    ;; Get the patch for the center of the food source
-    ask patch x-coord y-coord [
-      ;; Find the patches around the center and set them as food
-      ask patches in-radius food-size [
-        set food-type ftype
-        set food? food? OR (distancexy x-coord y-coord) < food-size ;; This condition is required to make sources round, can be replaced with true
+to spawn-food-sources [ftype number-of-sources probability]
+  ;; Only spawn food sources with a given probability
+  let random-draw random-float 1
+  if random-draw < probability [
+    repeat number-of-sources [
+      ;; Get center for new patch
+      let x-coord random-location min-pxcor max-pxcor
+      let y-coord random-location min-pycor max-pycor
+      let food-size ftype ;; In general the food size is the type
+      if ftype = 3 [
+        ;; Except for dead bugs that have the same size as live bugs
+        set food-size 2
+      ]
+      ;; Get the patch for the center of the food source
+      ask patch x-coord y-coord [
+        ;; Find the patches around the center and set them as food
+        ask patches in-radius food-size [
+          set food-type ftype
+          set food? food? OR (distancexy x-coord y-coord) < food-size ;; This condition is required to make sources round, can be replaced with true
+        ]
       ]
     ]
   ]
@@ -123,8 +131,8 @@ to recolor-patch
   [ set pcolor violet ]
   [ifelse food? [
       if food-type = 1 [ set pcolor orange ] ;; seed
-      if food-type = 2 [ set pcolor brown ] ;; bug
-      if food-type = 3 [ set pcolor green ] ;; leaves
+      if food-type = 2 [ set pcolor green ] ;; bug
+      if food-type = 3 [ set pcolor brown ] ;; dead bugs
       if food-type = 4 [ set pcolor yellow ] ;; honeydew
     ] [
       ;; If there is food-scent, show it
@@ -158,21 +166,22 @@ end
 ;;;;;;;;;;;;;;;;;;;;;
 
 to go
-  ask turtles
-  [
-  if who >= ticks [ stop ] ;; delay initial departure
-  ;; works like an case statement so depending on the state the ant excecutes a particular behaviour
-  if (state = "waiting" ) [hold]
-  if (state = "searching" ) [search]
-  if (state = "following" ) [follow-ant]
-  if (state = "exploiting" ) [exploit]
-  if (state = "exploit-bug" ) [exploiting-bug]
-  if (state = "recruiting" ) [recruit]
+  ask turtles  [
+    if who >= ticks [ stop ] ;; delay initial departure
+                             ;; works like an case statement so depending on the state the ant excecutes a particular behaviour
+    if (state = "waiting" ) [hold]
+    if (state = "searching" ) [search]
+    if (state = "following" ) [follow-ant]
+    if (state = "exploiting" ) [exploit]
+    if (state = "exploit-bug" ) [exploiting-bug]
+    if (state = "recruiting" ) [recruit]
   ]
 
   setup-pheromones
   diffuse-chemical
   diffuse-pheromones
+
+  respawn-food
 
   ;; Add the food-scent
   ask patches with [food?] [
@@ -181,6 +190,12 @@ to go
   ;; And diffuse it
   diffuse food-scent 0.3
   tick
+end
+
+to respawn-food
+  spawn-food-sources 1 1 (seeds-spawn-probability / 100)
+  spawn-food-sources 2 1 (bugs-spawn-probability / 100)
+  spawn-food-sources 3 1 (dead-bugs-spawn-probability / 100)
 end
 
 ;; @**********@ patch procedure @**********@ ;;
@@ -635,8 +650,8 @@ SLIDER
 149
 1379
 182
-leaves
-leaves
+dead-bugs
+dead-bugs
 0
 100
 9.0
@@ -733,6 +748,51 @@ pheromone-return
 pheromone-return
 1 2 3
 2
+
+SLIDER
+1407
+51
+1619
+84
+seeds-spawn-probability
+seeds-spawn-probability
+0
+10
+3.5
+0.1
+1
+%
+HORIZONTAL
+
+SLIDER
+1409
+97
+1615
+130
+bugs-spawn-probability
+bugs-spawn-probability
+0
+10
+0.5
+0.1
+1
+%
+HORIZONTAL
+
+SLIDER
+1410
+148
+1637
+181
+dead-bugs-spawn-probability
+dead-bugs-spawn-probability
+0
+10
+0.1
+0.1
+1
+%
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
