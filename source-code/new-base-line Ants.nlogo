@@ -32,7 +32,7 @@ patches-own [
   chemical-return      ;; amount of chemical on this patch
   pheromone-recruit       ;; a type of pheromone that is droped when help to carry big food source is requiered
   food?                ;; is there food on this patch?
-  food-type            ;; type of food in this patch if any - 0: none - 1: seed - 2: bug - 3: leaves - 4 : honeydew
+  food-type            ;; type of food in this patch if any - 0: none - 1: seed - 2: bug - 3: dead bugs - 4 : honeydew
   nest?                ;; true on nest patches, false elsewhere
   nest-scent           ;; number that is higher closer to the nest
   food-scent           ;; the smell a food source produces in the neigbors around
@@ -323,16 +323,19 @@ to exploit
     ;; We are not loaded, so we should try to grab food	
     ;; Is there food? ->  Grab it	
     if food? [	
-      ifelse (food-type = 2)
-      [
-      record-food-location
-      set bug-size measure-bug          ;; see how many comrades would be needed to carry th bug
-      set state "recruiting"
-      stop
+      ifelse (food-type = 2) [
+        record-food-location
+        set bug-size measure-bug          ;; see how many comrades would be needed to carry th bug
+        set state "recruiting"
+        stop
       ][
-      set food? false	
-      set loaded? true	
-      set load-type food-type
+        ;; The ant consumes the food unless it is honeydew
+        if food-type != 4 [
+          set food? false	
+          set food-type 0
+        ]
+        set loaded? true	
+        set load-type food-type
       ]
     ]	
     ;; Is there the scent of food? -> move towards higher concentrations of it	
@@ -773,7 +776,7 @@ bugs-spawn-probability
 bugs-spawn-probability
 0
 10
-0.5
+1.0
 0.1
 1
 %
@@ -788,7 +791,7 @@ dead-bugs-spawn-probability
 dead-bugs-spawn-probability
 0
 10
-0.1
+0.5
 0.1
 1
 %
