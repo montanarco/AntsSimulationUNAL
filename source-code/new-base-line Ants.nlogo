@@ -8,8 +8,11 @@ globals [
   pheromones-diffusion
   pheromones-evaporation
   pheromones-help-evaporation
+  honeydewid
 ]
 breed [ants ant]        ;; ants breed is declared
+
+breed [foodmarks foodmark]
 
 ants-own [              ;; ant atributes
   state
@@ -36,6 +39,13 @@ patches-own [
   nest?                ;; true on nest patches, false elsewhere
   nest-scent           ;; number that is higher closer to the nest
   food-scent           ;; the smell a food source produces in the neigbors around
+  food-id
+]
+
+foodmarks-own[
+  id
+  amount-collected
+  quality
 ]
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -45,6 +55,7 @@ patches-own [
 to setup
   clear-all
   set-default-shape ants "bug"
+  set honeydewid 0
   ;;calculate random locations for the nest and the ants
   random-seed ran-seed ;; Useful to have repeatable experiments
   set nest-xcor random-location min-pxcor max-pxcor
@@ -96,7 +107,7 @@ end
 to setup-pheromones
   set pheromones-diffusion read-from-string pheromone-diffusion-rates
   set pheromones-evaporation read-from-string pheromone-evaporation-rates
-  set pheromones-help-evaporation 5
+  set pheromones-help-evaporation 13
 end
 
 	;; Sets the number of food sources indicated by the food-sources slider
@@ -113,16 +124,46 @@ to spawn-food-sources [ftype number-of-sources probability]
         ;; Except for dead bugs that have the same size as live bugs
         set food-size 2
       ]
+      if ftype = 4 [
+        ;; Except for dead bugs that have the same size as live bugs
+        create-foodmarks 1
+        [
+          set honeydewid honeydewid + 1
+          set id honeydewid
+          set amount-collected 0
+          show word "honeydewid  " id
+        ]
+        set food-size ftype
+      ]
       ;; Get the patch for the center of the food source
       ask patch x-coord y-coord [
         ;; Find the patches around the center and set them as food
         ask patches in-radius food-size [
           set food-type ftype
+          if ftype = 4 [set food-id honeydewid]
           set food? food? OR (distancexy x-coord y-coord) < food-size ;; This condition is required to make sources round, can be replaced with true
         ]
       ]
     ]
   ]
+end
+
+to place-honeydew [honeydew-id]
+      ;; Get center for new patch
+      let x-coord random-location min-pxcor max-pxcor
+      let y-coord random-location min-pycor max-pycor
+      let food-size 4 ;; In general the food size is the type
+        ;; Except for dead bugs that have the same size as live bugs
+        set food-size 4
+      ;; Get the patch for the center of the food source
+      ask patch x-coord y-coord [
+        ;; Find the patches around the center and set them as food
+        ask patches in-radius food-size [
+          set food-type 4
+          set food-id honeydew-id
+          set food? food? OR (distancexy x-coord y-coord) < food-size ;; This condition is required to make sources round, can be replaced with true
+        ]
+      ]
 end
 
 	;; @**********@ patch procedure @**********@ ;;
@@ -166,7 +207,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;;
 
 to go
-  ask turtles  [
+  ask ants  [
     if who >= ticks [ stop ] ;; delay initial departure
                              ;; works like an case statement so depending on the state the ant excecutes a particular behaviour
     if (state = "waiting" ) [hold]
@@ -196,6 +237,31 @@ to respawn-food
   spawn-food-sources 1 1 (seeds-spawn-probability / 100)
   spawn-food-sources 2 1 (bugs-spawn-probability / 100)
   spawn-food-sources 3 1 (dead-bugs-spawn-probability / 100)
+  ;;evaluate-honeydew     ;; mechanism to cahnge honeydew location in order to validate memori efect over pheromone track
+end
+
+to evaluate-honeydew
+  let contador 1
+  while [contador <= honeydew] [
+    let numfoodmks count foodmarks with [id = contador and amount-collected > 100]
+    if (numfoodmks > 0)
+    [move-honeydew contador]
+    set contador contador + 1
+  ]
+end
+
+to move-honeydew [honeydew-id]
+  ask patches with [food-type = 4 and food-id = honeydew-id] [
+    ;; removing all food information from here
+  set food? false
+  set food-type 0
+  set food-scent 0
+  set food-id ""
+  ]
+  ;; placing a honeydew in other random location
+  ask foodmarks with [id = honeydew-id] [set amount-collected 0 ]
+  place-honeydew honeydew-id
+
 end
 
 ;; @**********@ patch procedure @**********@ ;;
@@ -203,6 +269,7 @@ to diffuse-chemical
   diffuse chemical-return ((diffusion pheromone-return)/ 100)
   ask patches [
     set chemical-return chemical-return * (100 - (evaporation pheromone-return)) / 100  ;; slowly evaporate chemical
+    ;;set chemical-return chemical-return - evaporation pheromone-return ;;
     ;; We need to lower the general level of food-scent since we are adding more constantly
     set food-scent food-scent / 1.1
   ]
@@ -285,7 +352,7 @@ to follow-ant
   if loaded?	
   [ set state "exploiting"	
     stop]	
-  let nearby-leaders turtles with [leader and (distance myself < 20)] ;; find nearby leaders	
+  let nearby-leaders ants with [leader and (distance myself < 20)] ;; find nearby leaders	
   if any? nearby-leaders [ ;; to avoid 'nobody'-error, check if there are any first	
     face min-one-of nearby-leaders [distance myself] ;; then face the one closest to myself	
     if not can-move? 1
@@ -293,7 +360,7 @@ to follow-ant
     fd 1	
 
     set loss-count loss-count + 1	
-    if(loss-count > 500)	
+    if(loss-count > 200)	
     [set state "searching"	
      set loss-count 0	
     ] ;; if i was following some one but i dont see him for a period i rather go searching again	
@@ -323,16 +390,22 @@ to exploit
     ;; We are not loaded, so we should try to grab food	
     ;; Is there food? ->  Grab it	
     if food? [	
-      ifelse (food-type = 2) [
+      ifelse (food-type = 3) [
         record-food-location
         set bug-size measure-bug          ;; see how many comrades would be needed to carry th bug
         set state "recruiting"
         stop
       ][
         ;; The ant consumes the food unless it is honeydew
-        if food-type != 4 [
+        ifelse food-type != 4 [
           set food? false	
           set food-type 0
+        ]
+        [
+          ask foodmarks with [id = food-id + 1] [set amount-collected amount-collected + 1
+          show word "food-id" food-id
+          show word "amount-collected" amount-collected
+          ]
         ]
         set loaded? true	
         set load-type food-type
@@ -354,12 +427,12 @@ to recruit
   let comrades count ants with [state = "recruiting"] in-radius 12
   ifelse (comrades >  (bug-size / 2))
   [
-    ask ants with [state = "recruiting"] in-radius 12 [set state "exploit-bug" ]
+    ask ants with [state = "recruiting"] in-radius 10 [set state "exploit-bug" ]
     ifelse (distancexy food-x food-y) > 0
     [find-bug-source]
     [set bug-leader true]
   ][
-   set pheromone-recruit pheromone-recruit + 100
+   set pheromone-recruit pheromone-recruit + 50
     recruit-circles
     fd 1
   ]
@@ -369,17 +442,17 @@ end
 to exploiting-bug
   set color brown
    ifelse bug-leader [
-    ask patches with [food? and food-type = 2] in-radius 10 [
+    ask patches with [food? and food-type = 3] in-radius 10 [
       set food? false
       set food-type 0
     ]
     ask patches in-radius 2 [
       set food? true
-      set food-type 2
+      set food-type 3
     ]
     ifelse nest? [
       set bug-leader false
-      ask patches with [food? and food-type = 2] in-radius 8 [
+      ask patches with [food? and food-type = 3] in-radius 8 [
       set food? false
       set food-type 0
       ]
@@ -439,7 +512,7 @@ to recruit-circles
   [ rt 180 ]
 
   set loss-count loss-count + 1	
-  if(loss-count > 100)	
+  if(loss-count > 50)	
   [set state "searching"	
      set loss-count 0	
   ] ;; if i was following some one but i dont see him for a period i rather go searching again	
@@ -447,8 +520,8 @@ end
 
 ;; @**********@ agent method @**********@ ;;
 to return-to-nest
-  if load-type > 2 [ ;; if we are harvesting seeds or bug there is no need to leave a pheromene trail
-    set chemical-return chemical-return + 60
+  if load-type != 1 or load-type != 3 [ ;; if we are harvesting seeds or bug there is no need to leave a pheromene trail
+    set chemical-return chemical-return + ( 0.01 * load-type) ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
     set leader false
   ]
   ;; this is to say that the ant has memory of nest location so it heads toward the next to return
@@ -487,13 +560,13 @@ to-report diffusion [pheromone]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-350
+397
 10
-1163
-824
+1308
+922
 -1
 -1
-5.0
+3.0
 1
 10
 1
@@ -503,10 +576,10 @@ GRAPHICS-WINDOW
 0
 0
 1
--80
-80
--80
-80
+-150
+150
+-150
+150
 1
 1
 1
@@ -571,7 +644,7 @@ ran-seed
 ran-seed
 0
 10000
-6112.0
+6304.0
 1
 1
 NIL
@@ -586,7 +659,7 @@ per_step_max_rotation
 per_step_max_rotation
 0
 180
-60.0
+40.0
 5
 1
 NIL
@@ -612,62 +685,62 @@ max_fullness
 max_fullness
 0
 200
-190.0
+200.0
 5
 1
 NIL
 HORIZONTAL
 
 SLIDER
-1204
-50
-1376
-83
+1347
+38
+1519
+71
 seeds
 seeds
 0
 200
-13.0
+20.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-1206
-99
-1378
-132
+1349
+87
+1521
+120
 bugs
 bugs
 0
 100
-6.0
+4.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-1207
-149
-1379
-182
+1350
+137
+1522
+170
 dead-bugs
 dead-bugs
 0
 100
-9.0
+4.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-1208
-197
-1380
-230
+1351
+185
+1523
+218
 honeydew
 honeydew
 0
@@ -694,84 +767,84 @@ true
 true
 "" ""
 PENS
-"waiting" 1.0 0 -16777216 true "" "plotxy ticks count turtles with [state = \"waiting\"]"
-"searching" 1.0 0 -2674135 true "" "plotxy ticks count turtles with [state = \"searching\"]"
-"following" 1.0 0 -1184463 true "" "plotxy ticks count turtles with [state = \"following\"]"
-"exploiting" 1.0 0 -13840069 true "" "plotxy ticks count turtles with [state = \"exploiting\"]"
-"recruiting" 1.0 0 -5207188 true "" "plotxy ticks count turtles with [state = \"recruiting\" or state = \"exploit-bug\"]"
+"waiting" 1.0 0 -16777216 true "" "plotxy ticks count ants with [state = \"waiting\"]"
+"searching" 1.0 0 -2674135 true "" "plotxy ticks count ants with [state = \"searching\"]"
+"following" 1.0 0 -1184463 true "" "plotxy ticks count ants with [state = \"following\"]"
+"exploiting" 1.0 0 -13840069 true "" "plotxy ticks count ants with [state = \"exploiting\"]"
+"recruiting" 1.0 0 -5207188 true "" "plotxy ticks count ants with [state = \"recruiting\" or state = \"exploit-bug\"]"
 
 TEXTBOX
-1191
-27
-1341
-45
+1350
+17
+1500
+35
 Food sources
 11
 0.0
 1
 
 TEXTBOX
-1194
-261
-1344
-279
+1350
+244
+1500
+262
 Pheromones
 11
 0.0
 1
 
 INPUTBOX
-1204
-286
-1479
-346
+1347
+274
+1622
+334
 pheromone-diffusion-rates
-[ 2 5 100 ]
+[ 2 1 100 ]
 1
 0
 String
 
 INPUTBOX
-1204
-358
-1475
-418
+1347
+346
+1618
+406
 pheromone-evaporation-rates
-[ 5 20 20 ]
+[ 5 0.1 20 ]
 1
 0
 String
 
 CHOOSER
-1205
-433
-1343
-478
+1348
+421
+1486
+466
 pheromone-return
 pheromone-return
 1 2 3
-2
+1
 
 SLIDER
-1407
-51
-1619
-84
+1550
+39
+1762
+72
 seeds-spawn-probability
 seeds-spawn-probability
 0
 10
-3.5
+0.9
 0.1
 1
 %
 HORIZONTAL
 
 SLIDER
-1409
-97
-1615
-130
+1552
+85
+1758
+118
 bugs-spawn-probability
 bugs-spawn-probability
 0
@@ -783,15 +856,15 @@ bugs-spawn-probability
 HORIZONTAL
 
 SLIDER
-1410
-148
-1637
-181
+1553
+136
+1780
+169
 dead-bugs-spawn-probability
 dead-bugs-spawn-probability
 0
 10
-0.5
+0.2
 0.1
 1
 %
