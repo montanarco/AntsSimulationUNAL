@@ -8,7 +8,7 @@ globals [
   pheromones-diffusion
   pheromones-evaporation
   pheromones-help-evaporation
-  honeydewid
+  last-feedernumber
 ]
 breed [ants ant]        ;; ants breed is declared
 
@@ -29,23 +29,20 @@ ants-own [              ;; ant atributes
   leader                ;; use to indicate other ants to follow self to be guided to the food source
   bug-size
   bug-leader
+  return-to-x           ;; X coordinate of the place to return after finding food
+  return-to-y           ;; Y coordinate of the place to return after finding food
+  serendipity           ;; Number of ticks for which the ant will ignore pheromone trails to look for new food sources
 ]
 
 patches-own [
   chemical-return      ;; amount of chemical on this patch
-  pheromone-recruit       ;; a type of pheromone that is droped when help to carry big food source is requiered
+  pheromone-recruit    ;; a type of pheromone that is droped when help to carry big food source is requiered
   food?                ;; is there food on this patch?
   food-type            ;; type of food in this patch if any - 0: none - 1: seed - 2: bug - 3: dead bugs - 4 : honeydew
   nest?                ;; true on nest patches, false elsewhere
   nest-scent           ;; number that is higher closer to the nest
   food-scent           ;; the smell a food source produces in the neigbors around
-  food-id
-]
-
-foodmarks-own[
-  id
-  amount-collected
-  quality
+  feedernumber         ;; id of the food source
 ]
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -55,7 +52,7 @@ foodmarks-own[
 to setup
   clear-all
   set-default-shape ants "bug"
-  set honeydewid 0
+  set last-feedernumber 0
   ;;calculate random locations for the nest and the ants
   random-seed ran-seed ;; Useful to have repeatable experiments
   set nest-xcor random-location min-pxcor max-pxcor
@@ -110,7 +107,7 @@ to setup-pheromones
   set pheromones-help-evaporation 13
 end
 
-	;; Sets the number of food sources indicated by the food-sources slider
+;; Sets the number of food sources indicated by the food-sources slider
 to spawn-food-sources [ftype number-of-sources probability]
   ;; Only spawn food sources with a given probability
   let random-draw random-float 1
@@ -124,23 +121,13 @@ to spawn-food-sources [ftype number-of-sources probability]
         ;; Except for dead bugs that have the same size as live bugs
         set food-size 2
       ]
-      if ftype = 4 [
-        ;; Except for dead bugs that have the same size as live bugs
-        create-foodmarks 1
-        [
-          set honeydewid honeydewid + 1
-          set id honeydewid
-          set amount-collected 0
-          show word "honeydewid  " id
-        ]
-        set food-size ftype
-      ]
+      set last-feedernumber (last-feedernumber + 1)
       ;; Get the patch for the center of the food source
       ask patch x-coord y-coord [
         ;; Find the patches around the center and set them as food
         ask patches in-radius food-size [
           set food-type ftype
-          if ftype = 4 [set food-id honeydewid]
+          set feedernumber last-feedernumber
           set food? food? OR (distancexy x-coord y-coord) < food-size ;; This condition is required to make sources round, can be replaced with true
         ]
       ]
@@ -148,25 +135,7 @@ to spawn-food-sources [ftype number-of-sources probability]
   ]
 end
 
-to place-honeydew [honeydew-id]
-      ;; Get center for new patch
-      let x-coord random-location min-pxcor max-pxcor
-      let y-coord random-location min-pycor max-pycor
-      let food-size 4 ;; In general the food size is the type
-        ;; Except for dead bugs that have the same size as live bugs
-        set food-size 4
-      ;; Get the patch for the center of the food source
-      ask patch x-coord y-coord [
-        ;; Find the patches around the center and set them as food
-        ask patches in-radius food-size [
-          set food-type 4
-          set food-id honeydew-id
-          set food? food? OR (distancexy x-coord y-coord) < food-size ;; This condition is required to make sources round, can be replaced with true
-        ]
-      ]
-end
-
-	;; @**********@ patch procedure @**********@ ;;
+;; @**********@ patch procedure @**********@ ;;
 to recolor-patch
   ifelse nest?
   [ set pcolor violet ]
@@ -240,30 +209,6 @@ to respawn-food
   ;;evaluate-honeydew     ;; mechanism to cahnge honeydew location in order to validate memori efect over pheromone track
 end
 
-to evaluate-honeydew
-  let contador 1
-  while [contador <= honeydew] [
-    let numfoodmks count foodmarks with [id = contador and amount-collected > 100]
-    if (numfoodmks > 0)
-    [move-honeydew contador]
-    set contador contador + 1
-  ]
-end
-
-to move-honeydew [honeydew-id]
-  ask patches with [food-type = 4 and food-id = honeydew-id] [
-    ;; removing all food information from here
-  set food? false
-  set food-type 0
-  set food-scent 0
-  set food-id ""
-  ]
-  ;; placing a honeydew in other random location
-  ask foodmarks with [id = honeydew-id] [set amount-collected 0 ]
-  place-honeydew honeydew-id
-
-end
-
 ;; @**********@ patch procedure @**********@ ;;
 to diffuse-chemical
   diffuse chemical-return ((diffusion pheromone-return)/ 100)
@@ -320,18 +265,23 @@ to search
   ]
   [
     ;; when the ant remembers a location where it has found any food, it goes back to check if there is more
-    ifelse f-memory
-    [ go-last-food-source
+    ifelse f-memory [
+      go-last-food-source
     ]
     [
-    ;; Otherwise just search at random
-    ifelse (pheromone-recruit >= 0.05) and (pheromone-recruit < 2)    ;; original mecanism of pheromone following
-       [join-chemical "pheromone"]
-       [
-         ifelse (chemical-return >= 0.05) and (chemical-return < 2)    ;; original mecanism of pheromone following
-            [join-chemical "chemical"]
-            [wiggle]
-       ]
+      ;; Otherwise follow a pheromone or just search at random
+      ifelse (pheromone-recruit >= 0.05) and (pheromone-recruit < 2) [   ;; original mecanism of pheromone following
+        join-chemical "pheromone"
+      ][
+        ifelse serendipity = 0 and (chemical-return >= 0.05) and (chemical-return < 2) [   ;; original mecanism of pheromone following
+          join-chemical "chemical"
+          ;; Stray the ant from the pheromone trail with a probability setting its serendipity to ignore trails
+          try-stray-from-path
+        ] [
+          wiggle
+          set serendipity max (list 0 (serendipity - 1)) ;; the serendipity should always be >= 0
+        ]
+      ]
     ]
   ]
   fd 1
@@ -352,19 +302,21 @@ to follow-ant
   if loaded?	
   [ set state "exploiting"	
     stop]	
-  let nearby-leaders ants with [leader and (distance myself < 20)] ;; find nearby leaders	
-  if any? nearby-leaders [ ;; to avoid 'nobody'-error, check if there are any first	
+  let nearby-leaders ants with [leader and (distance myself < 10)] ;; find nearby leaders	
+  ifelse any? nearby-leaders [ ;; to avoid 'nobody'-error, check if there are any first	
     face min-one-of nearby-leaders [distance myself] ;; then face the one closest to myself	
     if not can-move? 1
     [ rt random 180 ]
     fd 1	
-
     set loss-count loss-count + 1	
-    if(loss-count > 200)	
-    [set state "searching"	
-     set loss-count 0	
+    if(loss-count > 200)	[
+      set state "searching"	
+      set loss-count 0	
     ] ;; if i was following some one but i dont see him for a period i rather go searching again	
-  ]	
+  ]	[
+    ;; We don't have a leader nearby, switch back to searching
+    set state "searching"	
+  ]
 end
 
 	;; @**********@ agent method @**********@ ;;	
@@ -397,15 +349,9 @@ to exploit
         stop
       ][
         ;; The ant consumes the food unless it is honeydew
-        ifelse food-type != 4 [
+        if food-type != 4 [
           set food? false	
           set food-type 0
-        ]
-        [
-          ask foodmarks with [id = food-id + 1] [set amount-collected amount-collected + 1
-          show word "food-id" food-id
-          show word "amount-collected" amount-collected
-          ]
         ]
         set loaded? true	
         set load-type food-type
@@ -493,6 +439,16 @@ to-report chemical-scent-at-angle [angle kind]
   ]
 end
 
+;; @**********@ patch procedure @**********@ ;;
+to try-stray-from-path
+  let random-draw random-float 1
+  if random-draw < stray-probability [
+    set serendipity ((random 50) + 30)
+    set return-to-x xcor
+    set return-to-y ycor
+  ]
+end
+
 ;; @**********@ agent method @**********@ ;;
 to wiggle  ;; turtle procedure
   ;; Move with less variability when getting out of the nest
@@ -562,11 +518,11 @@ end
 GRAPHICS-WINDOW
 397
 10
-1308
-922
+1269
+883
 -1
 -1
-3.0
+4.3
 1
 10
 1
@@ -576,10 +532,10 @@ GRAPHICS-WINDOW
 0
 0
 1
--150
-150
--150
-150
+-100
+100
+-100
+100
 1
 1
 1
@@ -595,7 +551,7 @@ population
 population
 1
 100
-100.0
+50.0
 1
 1
 NIL
@@ -644,7 +600,7 @@ ran-seed
 ran-seed
 0
 10000
-6304.0
+3822.0
 1
 1
 NIL
@@ -700,7 +656,7 @@ seeds
 seeds
 0
 200
-20.0
+0.0
 1
 1
 NIL
@@ -715,7 +671,7 @@ bugs
 bugs
 0
 100
-4.0
+0.0
 1
 1
 NIL
@@ -730,7 +686,7 @@ dead-bugs
 dead-bugs
 0
 100
-4.0
+0.0
 1
 1
 NIL
@@ -745,7 +701,7 @@ honeydew
 honeydew
 0
 20
-3.0
+8.0
 1
 1
 NIL
@@ -834,7 +790,7 @@ seeds-spawn-probability
 seeds-spawn-probability
 0
 10
-0.9
+0.7
 0.1
 1
 %
@@ -849,7 +805,7 @@ bugs-spawn-probability
 bugs-spawn-probability
 0
 10
-1.0
+0.7
 0.1
 1
 %
@@ -864,7 +820,22 @@ dead-bugs-spawn-probability
 dead-bugs-spawn-probability
 0
 10
-0.2
+0.6
+0.1
+1
+%
+HORIZONTAL
+
+SLIDER
+25
+197
+197
+230
+stray-probability
+stray-probability
+0
+10
+10.0
 0.1
 1
 %
