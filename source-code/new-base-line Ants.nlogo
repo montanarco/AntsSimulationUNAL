@@ -9,7 +9,16 @@ globals [
   pheromones-evaporation
   pheromones-help-evaporation
   last-feedernumber
+  MemoryArray
+  honeyDewLoc
+  lstHoneyDew
+  BugsLoc
+  lstBugsLoc
+  lstDeadBugsLoc
+  DeadBugsLoc
+  memory-switches       ;; global counter to indicate how many times ants have change food-location memory
 ]
+
 breed [ants ant]        ;; ants breed is declared
 
 breed [foodmarks foodmark]
@@ -23,9 +32,11 @@ ants-own [              ;; ant atributes
   loss-count            ;; this variable determines when an ant is lost
   fullness              ;; this variable measures if the ant feels hungry, so it can start looking for food
   food
-  food-x                ;; the x coordinate where the ant found food the last time
-  food-y                ;; the y coordinate where the ant found food the last time
+  memX                  ;; the x coordinate where the ant found food the last time
+  memY                ;; the y coordinate where the ant found food the last time
   f-memory              ;; indicate if the ant have found any food source
+  memstrength
+  newfeedermemstrength
   leader                ;; use to indicate other ants to follow self to be guided to the food source
   bug-size
   bug-leader
@@ -51,13 +62,51 @@ patches-own [
 	
 to setup
   clear-all
+  setup-globals
   set-default-shape ants "bug"
   set last-feedernumber 0
   ;;calculate random locations for the nest and the ants
   random-seed ran-seed ;; Useful to have repeatable experiments
-  set nest-xcor random-location min-pxcor max-pxcor
-  set nest-ycor random-location min-pycor max-pycor
-  create-ants population
+  nest-location
+  setup-ants
+  setup-patches
+  reset-ticks
+end
+
+to nest-location
+  ifelse fixed-food?
+  [ set nest-xcor -21
+    set nest-ycor -12 ]
+  [ set nest-xcor random-location min-pxcor max-pxcor
+    set nest-ycor random-location min-pycor max-pycor ]
+end
+
+to setup-globals
+  set MemoryArray array:from-list
+    [
+     0  0.469879518  0.759036145  0.879518072  0.88  0.9375  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  0  0.3095  0.38  0.558255284  0.8145  0.8524  0.9204  0.913040429  0.9527  0.984  1  1  1  1  1  1  1  1  1  1  1  1  0  0.15942029  0.434782609  0.463768116  0.768115942  0.710144928  0.803030303  0.852459016  0.87037037  0.952380952  1  0.961538462  1  1  1  1  1  1  1  1  1  1  0  0.1849  0.2888  0.346276625  0.6193  0.7182  0.8176  0.843085381  0.8929  0.944  0.9638  0.9844  1  1  1  1  1  1  1  1  1  1  0  0.014492754  0.173913043  0.304347826  0.565217391  0.753623188  0.823529412  0.830769231  0.919354839  0.960784314  0.973684211  1  1  1  1  1  1  1  1  1  1  1  0  0  0.1274  0.261876361  0.4665  0.6048  0.7308  0.804676029  0.8451  0.912  0.9292  0.9694  0.99  1  1  1  1  1  1  1  1  1  0  0  0.083  0.235488639  0.406  0.5559  0.6934  0.790536967  0.8257  0.899  0.9134  0.9634  0.98  1  1  1  1  1  1  1  1  1  0  0  0.058  0.214789728  0.3561  0.5122  0.66  0.778490127  0.8093  0.888  0.8986  0.9584  0.97  1  1  1  1  1  1  1  1  1  0  0  0.0488  0.198047525  0.3168  0.4737  0.6306  0.768016533  0.7959  0.879  0.8848  0.9544  0.96  1  1  1  1  1  1  1  1  1  0  0  0.033333333  0.152542373  0.237288136  0.389830508  0.593220339  0.745762712  0.762711864  0.842105263  0.833333333  0.921568627  0.95  1  1  1  1  1  1  1  1  1  0  0  0.035  0.172473727  0.27  0.4123  0.5838  0.750495857  0.7781  0.867  0.8602  0.9494  0.95  1  1  1  1  1  1  1  1  1  0  0  0.036  0.162437625  0.2625  0.3894  0.5664  0.743023611  0.7737  0.864  0.8494  0.9484  0.95  1  1  1  1  1  1  1  1  1  0  0  0.037  0.153721828  0.2656  0.3717  0.553  0.736215526  0.7723  0.863  0.8396  0.9484  0.948  1  1  1  1  1  1  1  1  1  0  0  0.038  0.146069752  0.2793  0.3592  0.5436  0.729967851  0.7739  0.864  0.8308  0.9494  0.946  1  1  1  1  1  1  1  1  1  0  0.013157895  0.039473684  0.157894737  0.328947368  0.355263158  0.539473684  0.736842105  0.776315789  0.864864865  0.826086957  0.95  0.944444444  1  1  1  1  1  1  1  1  1
+    ]
+  ;; this are x & y locartion for each food patch Honeydews, Bugs & dead Bugs
+  set lstHoneyDew
+   [
+      -25 15 -26 36 -25 46 -65 0 -45 -25 -38  -35 -77  -43 6 -37 0 -15 17 -2 31 -6 35 -32 23 -29 58 -6 49 -25 63 39 74 36 105 9
+   ]
+  set honeyDewLoc array:from-list lstHoneyDew
+  set lstBugsLoc
+   [
+      -48 -10 -55 -10 -51 -10 -57 -10 -82 -11 -99 -16 -102 -16 -62 30 -57 26 -57 23 -82 13 -82 16 -82 19 -79 16 -85 19 -79 19 -101 60 -104 60 -107 60 -110 60 -10 10 -10 7 -7 10 -13 10  3 7 3 49 3 51 6 49 9 49 0 51
+      -3 51 0 54 -3 54  0 71 0 73 3 73 -16 75 -14 78 -14 81 -11 78 -11 75 -13 75  -23 78 -23 81 -23 84 40 -7 37 -7 35 -7 47 2 50 2 53 2 84 28 87 29 87 26 89 26 107 46 110 46 113 46 111 48 111 43
+   ]
+  set BugsLoc array:from-list lstBugsLoc
+   set lstDeadBugsLoc
+   [
+      -93 45 -96 45 -13 16 3 14 -18 65  -18 62 63 23 66 23 100 64
+   ]
+  set DeadBugsLoc array:from-list lstDeadBugsLoc
+end
+
+to setup-ants
+   create-ants population
   [ set size   2         ;; easier to see
     set color  red       ;; red = not carrying food
     set state "waiting"
@@ -66,14 +115,13 @@ to setup
     set steps 0
     set loaded? false
     set fullness random max_fullness
+    set memstrength 1
     set f-memory false
     set leader false
     set bug-leader false
     set load-type 0
     if trace? [ pen-down ]
   ]
-  setup-patches
-  reset-ticks
 end
 
 to setup-patches
@@ -83,11 +131,30 @@ to setup-patches
     set nest? false
     set food-scent 0
   ]
+  ifelse fixed-food?
+  [ fixed-patches ]
+  [ random-patches ]
+end
+
+to random-patches
   spawn-food-sources 1 seeds 1
   spawn-food-sources 2 bugs 1
   spawn-food-sources 3 dead-bugs 1
   spawn-food-sources 4 honeydew 1
   ask patches [
+    setup-nest nest-xcor nest-ycor ;; Place the nest at a random point
+    recolor-patch ;; Color all the patches depending if they are food source or nest
+  ]
+end
+
+to fixed-patches
+   set nest-xcor -21
+   set nest-ycor -12
+   let numfood length lstHoneyDew ;; these are the corrdinates of food as they are x & y coordinates the list must be divided be 2 in order to find the location number
+   locate-fix-food 2 BugsLoc (length lstBugsLoc) 2
+   locate-fix-food 3 DeadBugsLoc (length lstDeadBugsLoc) 2
+   locate-fix-food 4 honeyDewLoc (length lstHoneyDew) 3
+   ask patches [
     setup-nest nest-xcor nest-ycor ;; Place the nest at a random point
     recolor-patch ;; Color all the patches depending if they are food source or nest
   ]
@@ -133,6 +200,27 @@ to spawn-food-sources [ftype number-of-sources probability]
       ]
     ]
   ]
+end
+
+to locate-fix-food [ftype coordarray numfood food-size]
+  let contador 0
+  while [contador < numfood]
+  [
+    let x-coord array:item coordarray contador
+    let y-coord array:item coordarray (contador + 1)
+    set last-feedernumber (last-feedernumber + 1)
+      ;; Get the patch for the center of the food source
+      ask patch x-coord y-coord [
+        ;; Find the patches around the center and set them as food
+        ask patches in-radius food-size [
+          set food-type ftype
+          set feedernumber last-feedernumber
+          set food? food? OR (distancexy x-coord y-coord) < food-size ;; This condition is required to make sources round, can be replaced with true
+        ]
+      ]
+    set contador contador + 2
+  ]
+
 end
 
 ;; @**********@ patch procedure @**********@ ;;
@@ -254,7 +342,7 @@ to search
   ;; Food has been found, proceed to exploiting state
   if food? OR food-scent > 0.1 [
     set state "exploiting"
-    record-food-location
+    do-memstrength
     stop
   ]
   ;; We are at the nest, define a heading at random and step out of it
@@ -265,7 +353,7 @@ to search
   ]
   [
     ;; when the ant remembers a location where it has found any food, it goes back to check if there is more
-    ifelse f-memory [
+    ifelse f-memory != 0 [
       go-last-food-source
     ]
     [
@@ -288,12 +376,62 @@ to search
   set steps steps + 1
 end
 
+
+
 ;; @**********@ agent method @**********@ ;;
-;; this stores the coordinates where food source was found
-to record-food-location
-  set f-memory true
-  set food-x xcor
-  set food-y ycor
+to do-memstrength
+     ;;when an ant first finds a full feeder it remembers it. If it comes there again it strengthens the memory by 1.
+     ;;If it gets there but it's empty it starts scouting, but keeps its memory.
+     ;;if it finds a different, productive feeder it sets newfeedermemstrength 1 higher.
+     ;;The probability of memory switching is governed by the relationship between memstrength and newfeedermemstrength
+     ;;The ants look up the probability in a lookup table called MemoryArray
+
+
+  if memstrength > max-memory [set memstrength max-memory]  ;sets a maximum memory strength, as defined by a slider in the interface tab
+  if newfeedermemstrength > 23 [set newfeedermemstrength 22]  ;prevents the newmemstrength to get above 22, as the look up table doesn't go higher than that
+  if memstrength < 0 [set memstrength 0] ;prevents memory going lower than 0
+
+  ifelse f-memory != 0               ; ifelse makes it so the ants learn the first feeder they find. If they don't have a memory, they can gain one.
+  [
+    ifelse f-memory = feedernumber
+      [set memstrength memstrength + 1 ]
+      [set newfeedermemstrength newfeedermemstrength + 1
+      SwitchNow?]
+  ]
+
+  [
+
+     set memstrength 1
+     set memX xcor
+     set memY ycor
+     set f-memory feedernumber
+  ]
+
+  if f-memory = 0 [set f-memory feedernumber] ;allows naive or switching ants to memorise new feeders
+
+end
+
+to SwitchNow?
+    if random-float 1 > SwitchChance memstrength newfeedermemstrength [switch-memory]           ;;;takes a random floating-point number between 0 and 1. If the number is bigger than the chance of memory switching, memory reset happens
+
+End
+
+
+to-report SwitchChance [CurrentMemStrength CurrentNewFeederMemStrength]
+  print word "CurrentMemStrength: " CurrentMemStrength
+  print word "CurrentNewFeederMemStrength: " CurrentNewFeederMemStrength
+  report
+  array:item MemoryArray (((CurrentMemStrength - 1) * 22) + CurrentNewFeederMemStrength)
+end
+
+to switch-memory       ;;;this  resets the ants memory: it now acts as if it is finding the new feeder it is on for the first time. In effect it switches its favoured feeder to this new feeder
+  set memstrength 1
+  set newfeedermemstrength 0
+  set f-memory 0
+  set memX xcor
+  set memY ycor
+  set memory-switches memory-switches + 1
+
 end
 
 	;; @**********@ agent method @**********@ ;;	
@@ -309,7 +447,7 @@ to follow-ant
     [ rt random 180 ]
     fd 1	
     set loss-count loss-count + 1	
-    if(loss-count > 200)	[
+    if(loss-count > 100)	[
       set state "searching"	
       set loss-count 0	
     ] ;; if i was following some one but i dont see him for a period i rather go searching again	
@@ -342,8 +480,8 @@ to exploit
     ;; We are not loaded, so we should try to grab food	
     ;; Is there food? ->  Grab it	
     if food? [	
+      do-memstrength
       ifelse (food-type = 3) [
-        record-food-location
         set bug-size measure-bug          ;; see how many comrades would be needed to carry th bug
         set state "recruiting"
         stop
@@ -373,8 +511,12 @@ to recruit
   let comrades count ants with [state = "recruiting"] in-radius 12
   ifelse (comrades >  (bug-size / 2))
   [
-    ask ants with [state = "recruiting"] in-radius 10 [set state "exploit-bug" ]
-    ifelse (distancexy food-x food-y) > 0
+    ask ants with [state = "recruiting"] in-radius 10 [
+      set state "exploit-bug"
+      set loaded? true	
+      set load-type food-type
+    ]
+    ifelse (distancexy memX memY) > 0
     [find-bug-source]
     [set bug-leader true]
   ][
@@ -398,20 +540,24 @@ to exploiting-bug
     ]
     ifelse nest? [
       set bug-leader false
-      ask patches with [food? and food-type = 3] in-radius 8 [
+      ask patches with [food? and food-type = 3] in-radius 10 [
       set food? false
       set food-type 0
+      set food-scent 0
       ]
+      set loaded? false	
       set state "searching"
     ]
     [ return-to-nest ]
   ]
-  [ return-to-nest ]
+  [ return-to-nest
+    if nest? [set state "searching"]
+  ]
 end
 
 	;; @**********@ agent method @**********@ ;;	
 to find-bug-source	
-    facexy food-x food-y ;; if i remember where i found food I turn in food direction.	
+    facexy memX memY ;; if i remember where i found food I turn in food direction.	
     if not can-move? 1
     [ rt random 180 ]
 end
@@ -477,7 +623,7 @@ end
 ;; @**********@ agent method @**********@ ;;
 to return-to-nest
   if load-type != 1 or load-type != 3 [ ;; if we are harvesting seeds or bug there is no need to leave a pheromene trail
-    set chemical-return chemical-return + ( 0.01 * load-type) ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
+    set chemical-return chemical-return + ( 0.03 * load-type) ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
     set leader false
   ]
   ;; this is to say that the ant has memory of nest location so it heads toward the next to return
@@ -490,14 +636,14 @@ end
 
 	;; @**********@ agent method @**********@ ;;	
 to go-last-food-source	
-  ifelse (distancexy food-x food-y) > 1	
+  ifelse (distancexy memX memY) > 1	
   [	
-    facexy food-x food-y ;; if i remember where i found food I turn in food direction.	
+    facexy memX memY ;; if i remember where i found food I turn in food direction.	
     if not can-move? 1
     [ rt random 180 ]
   ]	
   [	
-    set f-memory false	
+    switch-memory 	
     set leader false
     ask ants in-radius 10 [ set state "searching" ]	
   ]	
@@ -518,11 +664,11 @@ end
 GRAPHICS-WINDOW
 397
 10
-1269
-883
+1283
+722
 -1
 -1
-4.3
+3.5
 1
 10
 1
@@ -532,8 +678,8 @@ GRAPHICS-WINDOW
 0
 0
 1
--100
-100
+-125
+125
 -100
 100
 1
@@ -551,7 +697,7 @@ population
 population
 1
 100
-50.0
+100.0
 1
 1
 NIL
@@ -600,7 +746,7 @@ ran-seed
 ran-seed
 0
 10000
-3822.0
+3818.0
 1
 1
 NIL
@@ -615,17 +761,17 @@ per_step_max_rotation
 per_step_max_rotation
 0
 180
-40.0
+30.0
 5
 1
 NIL
 HORIZONTAL
 
 SWITCH
-58
-661
-161
-694
+27
+650
+130
+683
 trace?
 trace?
 1
@@ -656,7 +802,7 @@ seeds
 seeds
 0
 200
-0.0
+13.0
 1
 1
 NIL
@@ -671,7 +817,7 @@ bugs
 bugs
 0
 100
-0.0
+4.0
 1
 1
 NIL
@@ -686,7 +832,7 @@ dead-bugs
 dead-bugs
 0
 100
-0.0
+4.0
 1
 1
 NIL
@@ -701,7 +847,7 @@ honeydew
 honeydew
 0
 20
-8.0
+2.0
 1
 1
 NIL
@@ -790,7 +936,7 @@ seeds-spawn-probability
 seeds-spawn-probability
 0
 10
-0.7
+0.3
 0.1
 1
 %
@@ -805,7 +951,7 @@ bugs-spawn-probability
 bugs-spawn-probability
 0
 10
-0.7
+0.2
 0.1
 1
 %
@@ -820,7 +966,7 @@ dead-bugs-spawn-probability
 dead-bugs-spawn-probability
 0
 10
-0.6
+0.1
 0.1
 1
 %
@@ -840,6 +986,42 @@ stray-probability
 1
 %
 HORIZONTAL
+
+TEXTBOX
+1352
+496
+1502
+514
+Memoria\n
+11
+0.0
+1
+
+SLIDER
+1349
+519
+1521
+552
+max-memory
+max-memory
+0
+15
+15.0
+1
+1
+NIL
+HORIZONTAL
+
+SWITCH
+150
+653
+271
+686
+fixed-food?
+fixed-food?
+0
+1
+-1000
 
 @#$#@#$#@
 ## WHAT IS IT?
