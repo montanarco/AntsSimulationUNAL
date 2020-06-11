@@ -71,6 +71,7 @@ to setup
   setup-ants
   setup-patches
   reset-ticks
+  stop-inspecting-dead-agents
 end
 
 to nest-location
@@ -116,11 +117,13 @@ to setup-ants
     set loaded? false
     set fullness random max_fullness
     set memstrength 1
-    set f-memory false
+    set f-memory 0
     set leader false
     set bug-leader false
     set load-type 0
     if trace? [ pen-down ]
+    set return-to-x nest-xcor
+    set return-to-y nest-ycor
   ]
 end
 
@@ -237,7 +240,7 @@ to recolor-patch
       set pcolor scale-color pink food-scent 0.1 20
       ;; If there is a trace of pheromone show it
       if chemical-return > 0.1 [
-        set pcolor scale-color green chemical-return 0.01 5
+        set pcolor scale-color green chemical-return 0 1
       ]
 
     if pheromone-recruit > 0.1 [
@@ -340,21 +343,22 @@ end
 to search
   set color red
   ;; Food has been found, proceed to exploiting state
-  if food? OR food-scent > 0.1 [
+  if serendipity < 20 AND (food? OR food-scent > 0.1) [
     set state "exploiting"
     do-memstrength
     stop
   ]
   ;; We are at the nest, define a heading at random and step out of it
-  ifelse nest? and steps = 0
-  [
+  ifelse nest? and steps = 0 [
     set steps 1
-    set heading random 360
+    set heading ( random 360 )
   ]
   [
-    ;; when the ant remembers a location where it has found any food, it goes back to check if there is more
-    ifelse f-memory != 0 [
+    ;; when the ant remembers a location where it has found any food, it goes back to check if there is more unless it is trying to search for more sources
+    ifelse serendipity > 0 AND f-memory != 0 [
       go-last-food-source
+      ;; Stray the ant from the direct route to the food with a probability setting its serendipity to ignore trails
+      try-stray-from-path
     ]
     [
       ;; Otherwise follow a pheromone or just search at random
@@ -418,10 +422,7 @@ End
 
 
 to-report SwitchChance [CurrentMemStrength CurrentNewFeederMemStrength]
-  print word "CurrentMemStrength: " CurrentMemStrength
-  print word "CurrentNewFeederMemStrength: " CurrentNewFeederMemStrength
-  report
-  array:item MemoryArray (((CurrentMemStrength - 1) * 22) + CurrentNewFeederMemStrength)
+  report array:item MemoryArray (min list (((CurrentMemStrength - 1) * 22) + CurrentNewFeederMemStrength) (array:length MemoryArray - 1) )
 end
 
 to switch-memory       ;;;this  resets the ants memory: it now acts as if it is finding the new feeder it is on for the first time. In effect it switches its favoured feeder to this new feeder
@@ -436,6 +437,10 @@ end
 
 	;; @**********@ agent method @**********@ ;;	
 to follow-ant	
+  ;; TODO : Disabling the following state - reenable later
+  set state "searching"	
+  stop
+  ;; Regular following logic bellow
   set color yellow	
   if loaded?	
   [ set state "exploiting"	
@@ -578,7 +583,8 @@ to-report chemical-scent-at-angle [angle kind]
   let p patch-right-and-ahead angle 1
   if p = nobody [ report 0 ]
   if (kind = "pheromone")[
-     report [pheromone-recruit] of p
+    report 0
+    ;;report [pheromone-recruit] of p
   ]
   if (kind = "chemical")[
      report [chemical-return] of p
@@ -628,7 +634,12 @@ to return-to-nest
   ]
   ;; this is to say that the ant has memory of nest location so it heads toward the next to return
   ;; this method should be canged for a path integration method
-  facexy nest-xcor nest-ycor
+  if (distancexy return-to-x return-to-y) < 3.0 [
+    ;; We arrieved at the pheromone trace, set the nest location again
+    set return-to-x nest-xcor
+    set return-to-y nest-ycor
+  ]
+  facexy return-to-x return-to-y
   if not can-move? 1
   [ rt 180 ]
   fd 1
@@ -662,13 +673,13 @@ to-report diffusion [pheromone]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-397
-10
-1283
-722
+359
+13
+1301
+770
 -1
 -1
-3.5
+3.7214
 1
 10
 1
@@ -746,7 +757,7 @@ ran-seed
 ran-seed
 0
 10000
-3818.0
+5478.0
 1
 1
 NIL
@@ -787,7 +798,7 @@ max_fullness
 max_fullness
 0
 200
-200.0
+75.0
 5
 1
 NIL
@@ -802,7 +813,7 @@ seeds
 seeds
 0
 200
-13.0
+0.0
 1
 1
 NIL
@@ -817,7 +828,7 @@ bugs
 bugs
 0
 100
-4.0
+0.0
 1
 1
 NIL
@@ -832,7 +843,7 @@ dead-bugs
 dead-bugs
 0
 100
-4.0
+0.0
 1
 1
 NIL
@@ -847,7 +858,7 @@ honeydew
 honeydew
 0
 20
-2.0
+8.0
 1
 1
 NIL
@@ -912,7 +923,7 @@ INPUTBOX
 1618
 406
 pheromone-evaporation-rates
-[ 5 0.1 20 ]
+[ 5 0.5 20 ]
 1
 0
 String
@@ -936,7 +947,7 @@ seeds-spawn-probability
 seeds-spawn-probability
 0
 10
-0.3
+0.0
 0.1
 1
 %
@@ -951,7 +962,7 @@ bugs-spawn-probability
 bugs-spawn-probability
 0
 10
-0.2
+0.0
 0.1
 1
 %
@@ -966,7 +977,7 @@ dead-bugs-spawn-probability
 dead-bugs-spawn-probability
 0
 10
-0.1
+0.0
 0.1
 1
 %
@@ -981,7 +992,7 @@ stray-probability
 stray-probability
 0
 10
-10.0
+0.5
 0.1
 1
 %
