@@ -1,5 +1,5 @@
 ;;Extensions
-extensions [array]
+extensions [array queue]
 
 ;;globals
 globals [
@@ -33,16 +33,18 @@ ants-own [              ;; ant atributes
   fullness              ;; this variable measures if the ant feels hungry, so it can start looking for food
   food
   memX                  ;; the x coordinate where the ant found food the last time
-  memY                ;; the y coordinate where the ant found food the last time
+  memY                  ;; the y coordinate where the ant found food the last time
   f-memory              ;; indicate if the ant have found any food source
   memstrength
   newfeedermemstrength
   leader                ;; use to indicate other ants to follow self to be guided to the food source
   bug-size
   bug-leader
-  return-to-x           ;; X coordinate of the place to return after finding food
-  return-to-y           ;; Y coordinate of the place to return after finding food
   serendipity           ;; Number of ticks for which the ant will ignore pheromone trails to look for new food sources
+  memory-waypoints      ;; List of list of x-y coordinates leading to a food source
+  memory-next           ;; Index of the current point in the waypoints we are trying to reach
+  memory-old-waypoints  ;; Waypoints to the previous food source, set before looking for other sources, will be restored if a better food source is not found
+  memory-old-next       ;; Position of the next waypoint from the old list of waypoints
 ]
 
 patches-own [
@@ -122,8 +124,8 @@ to setup-ants
     set bug-leader false
     set load-type 0
     if trace? [ pen-down ]
-    set return-to-x nest-xcor
-    set return-to-y nest-ycor
+    set memory-waypoints ( list ( list nest-xcor nest-ycor ) )
+    set memory-next 0
   ]
 end
 
@@ -355,7 +357,7 @@ to search
   ]
   [
     ;; when the ant remembers a location where it has found any food, it goes back to check if there is more unless it is trying to search for more sources
-    ifelse serendipity > 0 AND f-memory != 0 [
+    ifelse serendipity = 0 AND f-memory != 0 [
       go-last-food-source
       ;; Stray the ant from the direct route to the food with a probability setting its serendipity to ignore trails
       try-stray-from-path
@@ -371,7 +373,7 @@ to search
           try-stray-from-path
         ] [
           wiggle
-          set serendipity max (list 0 (serendipity - 1)) ;; the serendipity should always be >= 0
+          decrease-serendipity
         ]
       ]
     ]
@@ -380,7 +382,21 @@ to search
   set steps steps + 1
 end
 
+to decrease-serendipity
+  ;; No serendipity, nothing to do
+  if serendipity = 0 [
+    stop
+  ]
 
+  ;; Serendipity is 1, restore the previous waypoints
+  if serendipity = 1 [
+      set memory-waypoints memory-old-waypoints
+      set memory-next memory-old-next
+  ]
+
+  ;; Decrease the serendipity
+  set serendipity ( serendipity - 1 )
+end
 
 ;; @**********@ agent method @**********@ ;;
 to do-memstrength
@@ -594,10 +610,15 @@ end
 ;; @**********@ patch procedure @**********@ ;;
 to try-stray-from-path
   let random-draw random-float 1
-  if random-draw < stray-probability [
+  ;; Only stray if there is no serendipity and we are either at this ant selected memory source or pheromone trail
+  if serendipity = 0 AND random-draw < stray-probability AND ( chemical-return > 0.1 OR f-memory = feedernumber ) [
+    ;; Save the previous path
+    set memory-old-waypoints memory-waypoints
+    set memory-old-next memory-next
+    ;; And generate a number of steps to be in the serendipity state
     set serendipity ((random 50) + 30)
-    set return-to-x xcor
-    set return-to-y ycor
+    ;; Add this point to our list of way points
+    add-waypoint xcor ycor
   ]
 end
 
@@ -634,18 +655,17 @@ to return-to-nest
   ]
   ;; this is to say that the ant has memory of nest location so it heads toward the next to return
   ;; this method should be canged for a path integration method
-  if (distancexy return-to-x return-to-y) < 3.0 [
-    ;; We arrieved at the pheromone trace, set the nest location again
-    set return-to-x nest-xcor
-    set return-to-y nest-ycor
+  if (distancexy waypoint-x waypoint-y) < 3.0 [
+    ;; We arrieved at the waypoint, go to the next one if we not on the nest
+    set memory-next ( max list (memory-next - 1) 0 )
   ]
-  facexy return-to-x return-to-y
+  facexy waypoint-x waypoint-y
   if not can-move? 1
   [ rt 180 ]
   fd 1
 end
 
-	;; @**********@ agent method @**********@ ;;	
+;; @**********@ agent method @**********@ ;;	
 to go-last-food-source	
   ifelse (distancexy memX memY) > 1	
   [	
@@ -671,6 +691,34 @@ to-report diffusion [pheromone]
   ;; gets the diffusion rate for the pheromone index
   report item (pheromone - 1) pheromones-diffusion
 end
+
+;; @**********@ Waypoints helper methods @**********@ ;;	
+
+;; @**********@ agent method @**********@ ;;	
+to-report waypoint-x
+  report item 0 waypoint
+end
+
+;; @**********@ agent method @**********@ ;;	
+to-report waypoint-y
+  report item 1 waypoint
+end
+
+;; @**********@ agent method @**********@ ;;	
+to-report waypoint
+  report item memory-next memory-waypoints
+end
+
+;; @**********@ agent method @**********@ ;;	
+to add-waypoint [x y]
+  ;; Add the waypoiunt to the list
+  set memory-waypoints lput ( list x y )  memory-waypoints
+  ;; And increase the next return target
+  set memory-next memory-next + 1
+end
+
+
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 359
@@ -708,7 +756,7 @@ population
 population
 1
 100
-100.0
+1.0
 1
 1
 NIL
@@ -757,7 +805,7 @@ ran-seed
 ran-seed
 0
 10000
-5478.0
+4204.0
 1
 1
 NIL
@@ -785,7 +833,7 @@ SWITCH
 683
 trace?
 trace?
-1
+0
 1
 -1000
 
@@ -923,7 +971,7 @@ INPUTBOX
 1618
 406
 pheromone-evaporation-rates
-[ 5 0.5 20 ]
+[ 5 0.1 20 ]
 1
 0
 String
@@ -991,9 +1039,9 @@ SLIDER
 stray-probability
 stray-probability
 0
-10
-0.5
-0.1
+1
+0.05
+0.01
 1
 %
 HORIZONTAL
@@ -1030,7 +1078,7 @@ SWITCH
 686
 fixed-food?
 fixed-food?
-0
+1
 1
 -1000
 
