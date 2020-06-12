@@ -32,8 +32,6 @@ ants-own [              ;; ant atributes
   loss-count            ;; this variable determines when an ant is lost
   fullness              ;; this variable measures if the ant feels hungry, so it can start looking for food
   food
-  memX                  ;; the x coordinate where the ant found food the last time
-  memY                  ;; the y coordinate where the ant found food the last time
   f-memory              ;; indicate if the ant have found any food source
   memstrength
   newfeedermemstrength
@@ -74,6 +72,7 @@ to setup
   setup-patches
   reset-ticks
   stop-inspecting-dead-agents
+  if trace? [ inspect ant 0 ]
 end
 
 to nest-location
@@ -344,10 +343,10 @@ end
 	;; @**********@ agent method @**********@ ;;
 to search
   set color red
-  ;; Food has been found, proceed to exploiting state
-  if serendipity < 20 AND (food? OR food-scent > 0.1) [
+  ;; Food has been found and we are not trying to explore different sources, proceed to exploiting state
+  if (food? OR food-scent > 0.1) AND ( ( serendipity > 0 AND f-memory != feedernumber) OR ( serendipity = 0 AND f-memory = feedernumber ) ) [
+    set serendipity 0
     set state "exploiting"
-    do-memstrength
     stop
   ]
   ;; We are at the nest, define a heading at random and step out of it
@@ -415,19 +414,22 @@ to do-memstrength
   [
     ifelse f-memory = feedernumber
       [set memstrength memstrength + 1 ]
-      [set newfeedermemstrength newfeedermemstrength + 1
-      SwitchNow?]
+      [
+        set newfeedermemstrength newfeedermemstrength + 1
+        SwitchNow?
+      ]
   ]
 
   [
 
      set memstrength 1
-     set memX xcor
-     set memY ycor
+     add-waypoint xcor ycor
      set f-memory feedernumber
   ]
 
-  if f-memory = 0 [set f-memory feedernumber] ;allows naive or switching ants to memorise new feeders
+  if f-memory = 0 [
+    set f-memory feedernumber
+  ] ;allows naive or switching ants to memorise new feeders
 
 end
 
@@ -445,10 +447,8 @@ to switch-memory       ;;;this  resets the ants memory: it now acts as if it is 
   set memstrength 1
   set newfeedermemstrength 0
   set f-memory 0
-  set memX xcor
-  set memY ycor
+  add-waypoint xcor ycor
   set memory-switches memory-switches + 1
-
 end
 
 	;; @**********@ agent method @**********@ ;;	
@@ -537,7 +537,7 @@ to recruit
       set loaded? true	
       set load-type food-type
     ]
-    ifelse (distancexy memX memY) > 0
+    ifelse (distancexy waypoint-x waypoint-y) > 0
     [find-bug-source]
     [set bug-leader true]
   ][
@@ -578,7 +578,7 @@ end
 
 	;; @**********@ agent method @**********@ ;;	
 to find-bug-source	
-    facexy memX memY ;; if i remember where i found food I turn in food direction.	
+    facexy waypoint-x waypoint-y ;; if i remember where i found food I turn in food direction.	
     if not can-move? 1
     [ rt random 180 ]
 end
@@ -657,7 +657,7 @@ to return-to-nest
   ;; this method should be canged for a path integration method
   if (distancexy waypoint-x waypoint-y) < 3.0 [
     ;; We arrieved at the waypoint, go to the next one if we not on the nest
-    set memory-next ( max list (memory-next - 1) 0 )
+    set-previous-waypoint
   ]
   facexy waypoint-x waypoint-y
   if not can-move? 1
@@ -667,14 +667,15 @@ end
 
 ;; @**********@ agent method @**********@ ;;	
 to go-last-food-source	
-  ifelse (distancexy memX memY) > 1	
+  ifelse (distancexy waypoint-x waypoint-y) > 1	
   [	
-    facexy memX memY ;; if i remember where i found food I turn in food direction.	
+    facexy waypoint-x waypoint-y ;; if i remember where i found food I turn in food direction.	
     if not can-move? 1
     [ rt random 180 ]
   ]	
   [	
-    switch-memory 	
+    set-next-waypoint
+    ;; switch-memory
     set leader false
     ask ants in-radius 10 [ set state "searching" ]	
   ]	
@@ -707,6 +708,20 @@ end
 ;; @**********@ agent method @**********@ ;;	
 to-report waypoint
   report item memory-next memory-waypoints
+end
+
+;; @**********@ agent method @**********@ ;;	
+to set-next-waypoint
+  if memory-next < ( length memory-waypoints - 1 ) [
+     set memory-next memory-next + 1
+  ]
+end
+
+;; @**********@ agent method @**********@ ;;	
+to set-previous-waypoint
+  if memory-next > 0 [
+     set memory-next memory-next - 1
+  ]
 end
 
 ;; @**********@ agent method @**********@ ;;	
@@ -805,7 +820,7 @@ ran-seed
 ran-seed
 0
 10000
-4204.0
+5732.0
 1
 1
 NIL
@@ -833,7 +848,7 @@ SWITCH
 683
 trace?
 trace?
-0
+1
 1
 -1000
 
@@ -846,7 +861,7 @@ max_fullness
 max_fullness
 0
 200
-75.0
+5.0
 5
 1
 NIL
@@ -906,7 +921,7 @@ honeydew
 honeydew
 0
 20
-8.0
+20.0
 1
 1
 NIL
@@ -1039,8 +1054,8 @@ SLIDER
 stray-probability
 stray-probability
 0
-1
-0.05
+5
+1.27
 0.01
 1
 %
