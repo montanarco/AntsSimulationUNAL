@@ -328,7 +328,7 @@ to hold
   set color white
   ;; While idle, the ant consumes its food reserves
   set fullness fullness - 1
-  ifelse fullness = 0  [
+  ifelse fullness <= 0  [
     ;; Bellow the hunger threshold, switch to searching
     set state "searching"
   ] [
@@ -344,7 +344,7 @@ end
 to search
   set color red
   ;; Food has been found and we are not trying to explore different sources, proceed to exploiting state
-  if (food? OR food-scent > 0.1) AND ( ( serendipity > 0 AND f-memory != feedernumber) OR ( serendipity = 0 AND f-memory = feedernumber ) ) [
+  if (food? OR food-scent > 0.1) AND ( ( serendipity > 0 AND food? AND f-memory != feedernumber ) OR ( serendipity <= 0 AND f-memory = feedernumber ) ) [
     set serendipity 0
     set state "exploiting"
     stop
@@ -382,7 +382,7 @@ to search
 end
 
 to decrease-serendipity
-  ;; No serendipity, nothing to do
+  ;; No serendipity, nothing to do here
   if serendipity = 0 [
     stop
   ]
@@ -616,9 +616,9 @@ to try-stray-from-path
     set memory-old-waypoints memory-waypoints
     set memory-old-next memory-next
     ;; And generate a number of steps to be in the serendipity state
-    set serendipity ((random 50) + 30)
+    set serendipity ((random random-serendipity ) + 30)
     ;; Add this point to our list of way points
-    add-waypoint xcor ycor
+    change-last-waypoint xcor ycor
   ]
 end
 
@@ -732,17 +732,22 @@ to add-waypoint [x y]
   set memory-next memory-next + 1
 end
 
-
+;; @**********@ agent method @**********@ ;;	
+to change-last-waypoint [x y]
+  ;; Replace the last waypoint with the new values
+  let last-index ( length memory-waypoints ) - 1
+  set memory-waypoints replace-item last-index memory-waypoints ( list x y )
+end
 
 @#$#@#$#@
 GRAPHICS-WINDOW
-359
-13
-1301
-770
+358
+10
+1312
+776
 -1
 -1
-3.7214
+3.77
 1
 10
 1
@@ -771,7 +776,7 @@ population
 population
 1
 100
-1.0
+100.0
 1
 1
 NIL
@@ -812,15 +817,15 @@ NIL
 1
 
 SLIDER
-26
-607
-198
-640
+24
+147
+196
+180
 ran-seed
 ran-seed
 0
 10000
-5732.0
+7627.0
 1
 1
 NIL
@@ -861,7 +866,7 @@ max_fullness
 max_fullness
 0
 200
-5.0
+0.0
 5
 1
 NIL
@@ -921,7 +926,7 @@ honeydew
 honeydew
 0
 20
-20.0
+16.0
 1
 1
 NIL
@@ -1055,7 +1060,7 @@ stray-probability
 stray-probability
 0
 5
-1.27
+5.0
 0.01
 1
 %
@@ -1080,7 +1085,7 @@ max-memory
 max-memory
 0
 15
-15.0
+1.0
 1
 1
 NIL
@@ -1096,6 +1101,21 @@ fixed-food?
 1
 1
 -1000
+
+SLIDER
+25
+606
+197
+639
+random-serendipity
+random-serendipity
+0
+100
+69.0
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
