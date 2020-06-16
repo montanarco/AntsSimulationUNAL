@@ -21,8 +21,6 @@ globals [
 
 breed [ants ant]        ;; ants breed is declared
 
-breed [foodmarks foodmark]
-
 ants-own [              ;; ant atributes
   state
   loaded?               ;; this informs if the ant is or not carring food
@@ -43,6 +41,8 @@ ants-own [              ;; ant atributes
   memory-next           ;; Index of the current point in the waypoints we are trying to reach
   memory-old-waypoints  ;; Waypoints to the previous food source, set before looking for other sources, will be restored if a better food source is not found
   memory-old-next       ;; Position of the next waypoint from the old list of waypoints
+  memory-x
+  memory-y
 ]
 
 patches-own [
@@ -50,6 +50,7 @@ patches-own [
   pheromone-recruit    ;; a type of pheromone that is droped when help to carry big food source is requiered
   food?                ;; is there food on this patch?
   food-type            ;; type of food in this patch if any - 0: none - 1: seed - 2: bug - 3: dead bugs - 4 : honeydew
+  nutritionalQuality   ;; this value represents the food quality for the simulation we want to make ants search in other place than close to the nest so this value is to be directly relate to the nest distance
   nest?                ;; true on nest patches, false elsewhere
   nest-scent           ;; number that is higher closer to the nest
   food-scent           ;; the smell a food source produces in the neigbors around
@@ -197,6 +198,7 @@ to spawn-food-sources [ftype number-of-sources probability]
       ask patch x-coord y-coord [
         ;; Find the patches around the center and set them as food
         ask patches in-radius food-size [
+          set nutritionalQuality distancexy nest-xcor nest-ycor
           set food-type ftype
           set feedernumber last-feedernumber
           set food? food? OR (distancexy x-coord y-coord) < food-size ;; This condition is required to make sources round, can be replaced with true
@@ -217,6 +219,7 @@ to locate-fix-food [ftype coordarray numfood food-size]
       ask patch x-coord y-coord [
         ;; Find the patches around the center and set them as food
         ask patches in-radius food-size [
+          set nutritionalQuality distancexy nest-xcor nest-ycor
           set food-type ftype
           set feedernumber last-feedernumber
           set food? food? OR (distancexy x-coord y-coord) < food-size ;; This condition is required to make sources round, can be replaced with true
@@ -346,6 +349,7 @@ to search
   ;; Food has been found and we are not trying to explore different sources, proceed to exploiting state
   if (food? OR food-scent > 0.1) AND ( ( serendipity > 0 AND food? AND f-memory != feedernumber ) OR ( serendipity <= 0 AND f-memory = feedernumber ) ) [
     set serendipity 0
+    record-food-location
     set state "exploiting"
     stop
   ]
@@ -359,7 +363,7 @@ to search
     ifelse serendipity = 0 AND f-memory != 0 [
       go-last-food-source
       ;; Stray the ant from the direct route to the food with a probability setting its serendipity to ignore trails
-      try-stray-from-path
+      if serendipity-on [try-stray-from-path]
     ]
     [
       ;; Otherwise follow a pheromone or just search at random
@@ -369,7 +373,7 @@ to search
         ifelse serendipity = 0 and (chemical-return >= 0.05) and (chemical-return < 2) [   ;; original mecanism of pheromone following
           join-chemical "chemical"
           ;; Stray the ant from the pheromone trail with a probability setting its serendipity to ignore trails
-          try-stray-from-path
+          if serendipity-on [try-stray-from-path]
         ] [
           wiggle
           decrease-serendipity
@@ -379,6 +383,12 @@ to search
   ]
   fd 1
   set steps steps + 1
+end
+
+to record-food-location
+  set f-memory feedernumber
+  set memory-x xcor
+  set memory-y ycor
 end
 
 to decrease-serendipity
@@ -404,7 +414,7 @@ to do-memstrength
      ;;if it finds a different, productive feeder it sets newfeedermemstrength 1 higher.
      ;;The probability of memory switching is governed by the relationship between memstrength and newfeedermemstrength
      ;;The ants look up the probability in a lookup table called MemoryArray
-
+  show word "do-memstrength" 1
 
   if memstrength > max-memory [set memstrength max-memory]  ;sets a maximum memory strength, as defined by a slider in the interface tab
   if newfeedermemstrength > 23 [set newfeedermemstrength 22]  ;prevents the newmemstrength to get above 22, as the look up table doesn't go higher than that
@@ -421,7 +431,6 @@ to do-memstrength
   ]
 
   [
-
      set memstrength 1
      add-waypoint xcor ycor
      set f-memory feedernumber
@@ -435,15 +444,17 @@ end
 
 to SwitchNow?
     if random-float 1 > SwitchChance memstrength newfeedermemstrength [switch-memory]           ;;;takes a random floating-point number between 0 and 1. If the number is bigger than the chance of memory switching, memory reset happens
-
+    show word "SwitchNow?" 1
 End
 
 
 to-report SwitchChance [CurrentMemStrength CurrentNewFeederMemStrength]
+   show word "SwitchChance" 1
   report array:item MemoryArray (min list (((CurrentMemStrength - 1) * 22) + CurrentNewFeederMemStrength) (array:length MemoryArray - 1) )
 end
 
 to switch-memory       ;;;this  resets the ants memory: it now acts as if it is finding the new feeder it is on for the first time. In effect it switches its favoured feeder to this new feeder
+  show word "switch-memory" 1
   set memstrength 1
   set newfeedermemstrength 0
   set f-memory 0
@@ -453,9 +464,6 @@ end
 
 	;; @**********@ agent method @**********@ ;;	
 to follow-ant	
-  ;; TODO : Disabling the following state - reenable later
-  set state "searching"	
-  stop
   ;; Regular following logic bellow
   set color yellow	
   if loaded?	
@@ -487,10 +495,11 @@ to exploit
     ifelse nest? [	
       set loaded? false	
       ;; when the ant remembers a location where it has found any food, call others to show where the food source is	
-      set leader true	
-      ask ants in-radius 3 [ set state "following" ]	
-      ;let turtleNum one-of ants in-radius 4
-      ;create-links-to turtleNum ;n-of 4 other turtles
+      if mechanical-recruit
+      [
+         set leader true	
+         ask ants in-radius 5 [ set state "following" ]	
+      ]
       set state "searching"	
       stop	
     ] [	
@@ -501,11 +510,19 @@ to exploit
     ;; We are not loaded, so we should try to grab food	
     ;; Is there food? ->  Grab it	
     if food? [	
-      do-memstrength
+      if memory-on [ do-memstrength ]
       ifelse (food-type = 3) [
-        set bug-size measure-bug          ;; see how many comrades would be needed to carry th bug
-        set state "recruiting"
-        stop
+        ifelse chemical-recruit
+        [
+          set bug-size measure-bug          ;; see how many comrades would be needed to carry th bug
+          set state "recruiting"
+          stop
+        ]
+        [
+          set loaded? true	
+          set load-type food-type
+          set food? false
+        ]
       ][
         ;; The ant consumes the food unless it is honeydew
         if food-type != 4 [
@@ -641,7 +658,7 @@ to recruit-circles
   [ rt 180 ]
 
   set loss-count loss-count + 1	
-  if(loss-count > 50)	
+  if(loss-count > 100)	
   [set state "searching"	
      set loss-count 0	
   ] ;; if i was following some one but i dont see him for a period i rather go searching again	
@@ -649,36 +666,71 @@ end
 
 ;; @**********@ agent method @**********@ ;;
 to return-to-nest
-  if load-type != 1 or load-type != 3 [ ;; if we are harvesting seeds or bug there is no need to leave a pheromene trail
-    set chemical-return chemical-return + ( 0.03 * load-type) ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
-    set leader false
+  ifelse return-nest-direct
+  [
+    ifelse serendipity-on[
+      if load-type != 1 or load-type != 3 [ ;; if we are harvesting seeds or bug there is no need to leave a pheromene trail
+        if deposit-pheromone
+        [ set chemical-return chemical-return + ( 0.03 * load-type)] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
+        set leader false
+      ]
+      ;; this is to say that the ant has memory of nest location so it heads toward the next to return
+      ;; this method should be canged for a path integration method
+      if (distancexy waypoint-x waypoint-y) < 3.0 [
+        ;; We arrieved at the waypoint, go to the next one if we not on the nest
+        set-previous-waypoint
+      ]
+      facexy waypoint-x waypoint-y
+      if not can-move? 1
+      [ rt 180 ]
+    ]
+    [
+      if load-type != 1 or load-type != 3 [ ;; if we are harvesting seeds or bug there is no need to leave a pheromene trail
+        if deposit-pheromone
+        [ set chemical-return chemical-return + ( 0.03 * load-type)] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
+        set leader false
+      ]
+      facexy nest-xcor nest-ycor
+     if not can-move? 1
+     [ rt 180 ]
+    ]
   ]
-  ;; this is to say that the ant has memory of nest location so it heads toward the next to return
-  ;; this method should be canged for a path integration method
-  if (distancexy waypoint-x waypoint-y) < 3.0 [
-    ;; We arrieved at the waypoint, go to the next one if we not on the nest
-    set-previous-waypoint
-  ]
-  facexy waypoint-x waypoint-y
-  if not can-move? 1
-  [ rt 180 ]
+  [wiggle]
   fd 1
 end
 
 ;; @**********@ agent method @**********@ ;;	
 to go-last-food-source	
-  ifelse (distancexy waypoint-x waypoint-y) > 1	
-  [	
-    facexy waypoint-x waypoint-y ;; if i remember where i found food I turn in food direction.	
-    if not can-move? 1
-    [ rt random 180 ]
-  ]	
-  [	
-    set-next-waypoint
-    ;; switch-memory
-    set leader false
-    ask ants in-radius 10 [ set state "searching" ]	
-  ]	
+  ifelse 	serendipity-on[
+    ifelse (distancexy waypoint-x waypoint-y) > 1	
+    [
+
+      facexy waypoint-x waypoint-y ;; if i remember where i found food I turn in food direction.	
+      if not can-move? 1
+      [ rt random 180 ]
+
+    ]	
+    [	
+      set-next-waypoint
+      ;; switch-memory
+    ]	
+  ]
+
+  [
+    ifelse (distancexy memory-x memory-y) > 1	
+     [
+      facexy memory-x memory-y
+      if not can-move? 1
+      [ rt random 180 ]
+    ]
+    [
+      set leader false
+      set f-memory 0
+      ask ants in-radius 10 [ set state "searching" ]	
+    ]
+
+  ]
+
 end
 
 
@@ -738,7 +790,6 @@ to change-last-waypoint [x y]
   let last-index ( length memory-waypoints ) - 1
   set memory-waypoints replace-item last-index memory-waypoints ( list x y )
 end
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 358
@@ -776,7 +827,7 @@ population
 population
 1
 100
-100.0
+99.0
 1
 1
 NIL
@@ -825,7 +876,7 @@ ran-seed
 ran-seed
 0
 10000
-7627.0
+7624.0
 1
 1
 NIL
@@ -881,7 +932,7 @@ seeds
 seeds
 0
 200
-0.0
+6.0
 1
 1
 NIL
@@ -896,7 +947,7 @@ bugs
 bugs
 0
 100
-0.0
+6.0
 1
 1
 NIL
@@ -911,7 +962,7 @@ dead-bugs
 dead-bugs
 0
 100
-0.0
+6.0
 1
 1
 NIL
@@ -926,7 +977,7 @@ honeydew
 honeydew
 0
 20
-16.0
+3.0
 1
 1
 NIL
@@ -1084,21 +1135,21 @@ SLIDER
 max-memory
 max-memory
 0
-15
-1.0
+20
+2.0
 1
 1
 NIL
 HORIZONTAL
 
 SWITCH
-150
-653
-271
-686
+138
+651
+242
+684
 fixed-food?
 fixed-food?
-1
+0
 1
 -1000
 
@@ -1111,11 +1162,98 @@ random-serendipity
 random-serendipity
 0
 100
-69.0
+65.0
 1
 1
 NIL
 HORIZONTAL
+
+SWITCH
+1348
+611
+1501
+644
+deposit-pheromone
+deposit-pheromone
+0
+1
+-1000
+
+SWITCH
+1516
+612
+1643
+645
+memory-on
+memory-on
+0
+1
+-1000
+
+SWITCH
+1346
+655
+1502
+688
+mechanical-recruit
+mechanical-recruit
+0
+1
+-1000
+
+SWITCH
+1516
+655
+1645
+688
+chemical-recruit
+chemical-recruit
+0
+1
+-1000
+
+SWITCH
+1517
+698
+1647
+731
+serendipity-on
+serendipity-on
+1
+1
+-1000
+
+SWITCH
+1346
+698
+1504
+731
+return-nest-direct
+return-nest-direct
+0
+1
+-1000
+
+TEXTBOX
+1350
+588
+1500
+606
+Mechanism Activation
+11
+0.0
+1
+
+MONITOR
+1549
+514
+1658
+559
+memory-switches
+memory-switches
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
