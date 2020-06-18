@@ -6,3 +6,14 @@
 Mechanic: 	A. by carring an ant of the next to the food source 
 		B. tandem guiding by little touch of ant to the leader 		body
 Chamical:  C. spreading a pheromone to comunicate other ants   			around help is requiered to carry a big nutritious 			food piece 
+
+measures
+Energetic efficiency. (need to be defined)
+Length of permanent trails. (search an strategy to do this)
+Amount of resources collected within a time window. (this is done by days)
+Average amount of energy per unit of food collected.
+Distribution of ants by type of food.
+Distribution of ants in the different states. (this is already done)
+Amount of food available in the environment over time.
+Foraging decisions: Quality vs. distance.
+
