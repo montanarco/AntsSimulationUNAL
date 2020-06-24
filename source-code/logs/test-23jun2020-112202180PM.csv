@@ -1,0 +1,7 @@
+day;energy-collected-day;trail-patches;food-collected-day;energy-avg;antsFTSeed;antsFTBug;antsFTDeadbug;antsFTHoneydew;antsSearching;antsFollowing;antsExploiting;antsExploit-bug;antsRecruiting;foodAvailable
+1;10;0;2;5;3;0;5;0;93;0;2;0;5;447
+2;88;0;4;22;7;0;16;0;82;7;10;0;1;425
+3;23;0;3;7.667;11;2;15;1;85;3;12;0;0;418
+4;51;0;4;12.75;14;7;14;3;75;2;23;0;0;407
+5;55;0;8;6.875;15;12;13;6;72;5;23;0;0;397
+6;150;0;16;9.375;16;20;11;10;58;13;29;0;0;377

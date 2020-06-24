@@ -1,8 +1,11 @@
 ;;Extensions
-extensions [array queue]
+extensions [array queue csv]
 
 ;;globals
 globals [
+  date
+  time
+  filename
   nest-xcor
   nest-ycor
   pheromones-diffusion
@@ -24,6 +27,7 @@ globals [
   elapsed-days          ;; a tiem frame is requiere to measure the amount collected
   energy-avg            ;; o	Average amount of energy per unit of food collected
   patches-per-tick      ;; number of patches the ants move in a tick
+  trail-patches         ;; number of patches that have enough chemical to be considered a trail
 ]
 
 breed [ants ant]        ;; ants breed is declared
@@ -37,6 +41,7 @@ ants-own [              ;; ant atributes
   fullness              ;; this variable measures if the ant feels hungry, so it can start looking for food
   energy                ;; this measures the enegetic expense of the colony while looking foor food.
   f-memory              ;; indicate if the ant have found any food source
+  f-type-memory
   nutriQuality-memory   ;; related to the quality of the last food source that was found
   memstrength
   newfeedermemstrength
@@ -81,7 +86,41 @@ to setup
   reset-ticks
   stop-inspecting-dead-agents
   if trace? [ inspect ant 0 ]
-  calculate-speed-per-tick
+  carefully [file-delete "temp.txt"] []
+  prepare-csv-file
+  ;;calculate-speed-per-tick
+end
+
+to prepare-csv-file
+  file-close-all
+  set date (remove "-" (substring date-and-time 16 27))
+  set time (remove "." remove ":" remove " " (substring date-and-time 0 15))
+  set filename (word "./logs/test-" date "-" time ".csv")
+  if file-exists? filename
+     [file-close
+      file-delete filename
+     ]
+     file-open filename
+  writeCSVrow filename  ["day" "energy-collected-day" "trail-patches" "food-collected-day" "energy-avg" "antsFTSeed" "antsFTBug" "antsFTDeadbug" "antsFTHoneydew" "antsSearching" "antsFollowing" "antsExploiting" "antsExploit-bug" "antsRecruiting" "foodAvailable"]
+end
+
+to writeCSVrow [#fname #vals]
+  file-open #fname
+  file-type first #vals
+  foreach but-first #vals [[?] ->
+    file-type "," file-type ?
+  ]
+  file-print ""  ;;terminate line with CR
+  file-close
+end
+
+to writeListToFile [#mylist #fname]
+  carefully [file-delete #fname] []
+  file-open #fname
+  foreach #mylist [[?] ->
+    file-print ?
+  ]
+  file-close
 end
 
 to calculate-speed-per-tick
@@ -103,6 +142,7 @@ end
 to setup-globals
   set food-collected 0
   set energy-collected 0
+  set trail-patches 0
   set MemoryArray array:from-list
     [
      0  0.469879518  0.759036145  0.879518072  0.88  0.9375  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  0  0.3095  0.38  0.558255284  0.8145  0.8524  0.9204  0.913040429  0.9527  0.984  1  1  1  1  1  1  1  1  1  1  1  1  0  0.15942029  0.434782609  0.463768116  0.768115942  0.710144928  0.803030303  0.852459016  0.87037037  0.952380952  1  0.961538462  1  1  1  1  1  1  1  1  1  1  0  0.1849  0.2888  0.346276625  0.6193  0.7182  0.8176  0.843085381  0.8929  0.944  0.9638  0.9844  1  1  1  1  1  1  1  1  1  1  0  0.014492754  0.173913043  0.304347826  0.565217391  0.753623188  0.823529412  0.830769231  0.919354839  0.960784314  0.973684211  1  1  1  1  1  1  1  1  1  1  1  0  0  0.1274  0.261876361  0.4665  0.6048  0.7308  0.804676029  0.8451  0.912  0.9292  0.9694  0.99  1  1  1  1  1  1  1  1  1  0  0  0.083  0.235488639  0.406  0.5559  0.6934  0.790536967  0.8257  0.899  0.9134  0.9634  0.98  1  1  1  1  1  1  1  1  1  0  0  0.058  0.214789728  0.3561  0.5122  0.66  0.778490127  0.8093  0.888  0.8986  0.9584  0.97  1  1  1  1  1  1  1  1  1  0  0  0.0488  0.198047525  0.3168  0.4737  0.6306  0.768016533  0.7959  0.879  0.8848  0.9544  0.96  1  1  1  1  1  1  1  1  1  0  0  0.033333333  0.152542373  0.237288136  0.389830508  0.593220339  0.745762712  0.762711864  0.842105263  0.833333333  0.921568627  0.95  1  1  1  1  1  1  1  1  1  0  0  0.035  0.172473727  0.27  0.4123  0.5838  0.750495857  0.7781  0.867  0.8602  0.9494  0.95  1  1  1  1  1  1  1  1  1  0  0  0.036  0.162437625  0.2625  0.3894  0.5664  0.743023611  0.7737  0.864  0.8494  0.9484  0.95  1  1  1  1  1  1  1  1  1  0  0  0.037  0.153721828  0.2656  0.3717  0.553  0.736215526  0.7723  0.863  0.8396  0.9484  0.948  1  1  1  1  1  1  1  1  1  0  0  0.038  0.146069752  0.2793  0.3592  0.5436  0.729967851  0.7739  0.864  0.8308  0.9494  0.946  1  1  1  1  1  1  1  1  1  0  0.013157895  0.039473684  0.157894737  0.328947368  0.355263158  0.539473684  0.736842105  0.776315789  0.864864865  0.826086957  0.95  0.944444444  1  1  1  1  1  1  1  1  1
@@ -145,6 +185,7 @@ to setup-ants
     set memory-waypoints ( list ( list nest-xcor nest-ycor ) )
     set memory-next 0
     set energy 50
+    set f-type-memory 0
   ]
 end
 
@@ -221,7 +262,6 @@ to spawn-food-sources [ftype number-of-sources probability]
           set feedernumber last-feedernumber
           set food? food? OR (distancexy x-coord y-coord) < food-size ;; This condition is required to make sources round, can be replaced with true
           set nutritionalQuality ((random 10) + 1) * ftype
-          print word "nutritionalQuality: " nutritionalQuality
         ]
       ]
     ]
@@ -243,7 +283,6 @@ to locate-fix-food [ftype coordarray numfood food-size]
           set feedernumber last-feedernumber
           set food? food? OR (distancexy x-coord y-coord) < food-size ;; This condition is required to make sources round, can be replaced with true
           set nutritionalQuality ((random 10) + 1) * ftype
-          print word "nutritionalQuality: " nutritionalQuality
         ]
       ]
     set contador contador + 2
@@ -326,11 +365,27 @@ to global-measures
   set elapsed-days floor (ticks / ticks-per-day)
   if days-comparator != elapsed-days ;; the time frame defined has change this estimates the amount collected during that frame
   [
-    set food-collected-day food-collected
-    set energy-collected-day energy-collected
-    set energy-avg energy-collected-day / food-collected-day
+    set food-collected-day precision food-collected 3
+    print word "food-collected-day: " food-collected-day
+    set energy-collected-day precision energy-collected 3
+    print word "energy-collected-day: " energy-collected-day
+    set energy-avg precision (energy-collected-day / food-collected-day) 3
+    print word "energy-avg: " precision (energy-avg) 3
+    set trail-patches count patches with [ chemical-return > 0.5]
+    print word "trail-patches: " trail-patches
     set food-collected 0
     set energy-collected 0
+    let antsFTSeed count ants with [f-type-memory = 1]
+    let antsFTBug count ants with [f-type-memory = 2]
+    let antsFTDeadbug count ants with [f-type-memory = 3]
+    let antsFTHoneydew count ants with [f-type-memory = 4]
+    let antsSearching count ants with [state = "searching"]
+    let antsFollowing count ants with [state = "following"]
+    let antsExploiting count ants with [state = "exploiting"]
+    let antsExploit-bug count ants with [state = "exploit-bug"]
+    let antsRecruiting count ants with [state = "recruiting"]
+    let foodAvailable count patches with [food?]
+    writeCSVrow filename  (list elapsed-days energy-collected-day trail-patches food-collected-day energy-avg antsFTSeed antsFTBug antsFTDeadbug antsFTHoneydew antsSearching antsFollowing antsExploiting antsExploit-bug antsRecruiting foodAvailable)
   ]
 end
 
@@ -425,9 +480,8 @@ end
 
 to record-food-location
   set f-memory feedernumber
+  set f-type-memory food-type
   set nutriQuality-memory nutritionalQuality
-  print word "nutritionalQuality+++ " nutritionalQuality
-  print word "nutriQuality-memory+++ " nutriQuality-memory
   set memory-x xcor
   set memory-y ycor
 end
@@ -536,9 +590,7 @@ to exploit
     ;; If we got to the nest -> unload food and restart searching	
     ifelse nest? [	
       set loaded? false	
-      set food-collected food-collected + 1 ;; if the ant is loaded ans arrives to the nest then he has collected a food unit
-      set energy-collected energy-collected + nutriQuality-memory ;; if the ant is loaded ans arrives to the nest then he has collected a food unit
-      print word "energy-collected: " energy-collected
+      update-instant-measures
       ;; when the ant remembers a location where it has found any food, call others to show where the food source is	
       if mechanical-recruit
       [
@@ -573,10 +625,10 @@ to exploit
         ]
       ][
         ;; The ant consumes the food unless it is honeydew
-        if food-type != 4 [
+        ;;if food-type != 4 [
           set food? false	
           set food-type 0
-        ]
+        ;;]
         set loaded? true	
         set load-type food-type
       ]
@@ -585,6 +637,12 @@ to exploit
       if food-scent > 0.1	
       [ uphill food-scent ]	
   ]	
+end
+
+to update-instant-measures
+  set food-collected food-collected + 1 ;; if the ant is loaded ans arrives to the nest then he has collected a food unit
+  set energy-collected energy-collected + nutriQuality-memory ;; if the ant is loaded ans arrives to the nest then he has collected a food unit
+
 end
 
 to-report measure-bug
@@ -703,15 +761,19 @@ end
 
 
 to recruit-circles
-  rt 15
-  if not can-move? 1
-  [ rt 180 ]
-
+  ifelse(loss-count < 100)
+  [
+    rt 15
+    if not can-move? 1
+    [ rt 180 ]
+  ]
+  [
+    if(loss-count > 120)	
+    [set state "searching"	
+      set loss-count 0	
+    ] ;; if i was following some one but i dont see him for a period i rather go searching again	
+  ]
   set loss-count loss-count + 1	
-  if(loss-count > 100)	
-  [set state "searching"	
-     set loss-count 0	
-  ] ;; if i was following some one but i dont see him for a period i rather go searching again	
 end
 
 ;; @**********@ agent method @**********@ ;;
@@ -721,8 +783,8 @@ to return-to-nest
     ifelse serendipity-on[
       if load-type != 1 or load-type != 3 [ ;; if we are harvesting seeds or bug there is no need to leave a pheromene trail
         if deposit-pheromone
-        [set chemical-return chemical-return + ( 0.03 * load-type)]
-        ;;[ set chemical-return chemical-return + (10 * nutriQuality-memory)] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
+        ;;[set chemical-return chemical-return + ( 0.03 * load-type)]
+        [ set chemical-return chemical-return + (0.002 * nutriQuality-memory)] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
         set leader false
       ]
       ;; this is to say that the ant has memory of nest location so it heads toward the next to return
@@ -738,8 +800,8 @@ to return-to-nest
     [
       if load-type != 1 or load-type != 3 [ ;; if we are harvesting seeds or bug there is no need to leave a pheromene trail
         if deposit-pheromone
-        [set chemical-return chemical-return + ( 0.03 * load-type)]
-        ;;[ set chemical-return chemical-return + (10 * nutriQuality-memory)] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
+        ;;[set chemical-return chemical-return + ( 0.03 * load-type)]
+        [ set chemical-return chemical-return + ( 0.002 * nutriQuality-memory)] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
         set leader false
       ]
       facexy nest-xcor nest-ycor
@@ -845,14 +907,15 @@ end
 
 ;; @**********@ agent method @**********@ ;;	
 to move-forward
-  fd patches-per-tick
+  ;;fd patches-per-tick
+  fd 1
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-358
-10
-1310
-775
+437
+26
+1389
+791
 -1
 -1
 3.7612
@@ -884,7 +947,7 @@ population
 population
 1
 100
-50.0
+100.0
 1
 1
 NIL
@@ -933,7 +996,7 @@ ran-seed
 ran-seed
 0
 10000
-7653.0
+8345.0
 1
 1
 NIL
@@ -955,10 +1018,10 @@ NIL
 HORIZONTAL
 
 SWITCH
-26
-621
-129
-654
+28
+569
+131
+602
 trace?
 trace?
 1
@@ -966,10 +1029,10 @@ trace?
 -1000
 
 SLIDER
-24
-535
-196
-568
+26
+483
+198
+516
 max_fullness
 max_fullness
 0
@@ -981,70 +1044,70 @@ NIL
 HORIZONTAL
 
 SLIDER
-1347
-38
-1519
-71
+1426
+54
+1598
+87
 seeds
 seeds
 0
 200
-9.0
+27.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-1349
-87
-1521
-120
+1428
+103
+1600
+136
 bugs
 bugs
 0
 100
-8.0
+11.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-1350
-137
-1522
-170
+1429
+153
+1601
+186
 dead-bugs
 dead-bugs
 0
 100
-7.0
+6.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-1351
-185
-1523
-218
+1430
+201
+1602
+234
 honeydew
 honeydew
 0
 20
-5.0
+6.0
 1
 1
 NIL
 HORIZONTAL
 
 PLOT
-24
-301
-302
-521
+28
+610
+306
+830
 Ants by State
 NIL
 NIL
@@ -1063,30 +1126,30 @@ PENS
 "recruiting" 1.0 0 -5207188 true "" "plotxy ticks count ants with [state = \"recruiting\" or state = \"exploit-bug\"]"
 
 TEXTBOX
-1350
-17
-1500
-35
+1434
+27
+1584
+45
 Food sources
 11
 0.0
 1
 
 TEXTBOX
-1350
-244
-1500
-262
+1429
+260
+1579
+278
 Pheromones
 11
 0.0
 1
 
 INPUTBOX
-1347
-274
-1622
-334
+1426
+290
+1701
+350
 pheromone-diffusion-rates
 [ 2 1 100 ]
 1
@@ -1094,10 +1157,10 @@ pheromone-diffusion-rates
 String
 
 INPUTBOX
-1347
-346
-1618
-406
+1426
+362
+1697
+422
 pheromone-evaporation-rates
 [ 5 0.1 20 ]
 1
@@ -1105,20 +1168,20 @@ pheromone-evaporation-rates
 String
 
 CHOOSER
-1348
-421
-1486
-466
+1427
+437
+1565
+482
 pheromone-return
 pheromone-return
 1 2 3
 1
 
 SLIDER
-1550
-39
-1762
-72
+1629
+55
+1841
+88
 seeds-spawn-probability
 seeds-spawn-probability
 0
@@ -1130,10 +1193,10 @@ seeds-spawn-probability
 HORIZONTAL
 
 SLIDER
-1552
-85
-1758
-118
+1631
+101
+1837
+134
 bugs-spawn-probability
 bugs-spawn-probability
 0
@@ -1145,10 +1208,10 @@ bugs-spawn-probability
 HORIZONTAL
 
 SLIDER
-1553
-136
-1780
-169
+1632
+152
+1859
+185
 dead-bugs-spawn-probability
 dead-bugs-spawn-probability
 0
@@ -1175,20 +1238,20 @@ stray-probability
 HORIZONTAL
 
 TEXTBOX
-1350
-475
-1500
-493
+1429
+491
+1579
+509
 Memoria\n
 11
 0.0
 1
 
 SLIDER
-1347
-498
-1519
-531
+1426
+514
+1598
+547
 max-memory
 max-memory
 0
@@ -1200,21 +1263,21 @@ NIL
 HORIZONTAL
 
 SWITCH
-137
-622
-241
-655
+139
+570
+243
+603
 fixed-food?
 fixed-food?
-0
+1
 1
 -1000
 
 SLIDER
-24
-577
-196
-610
+26
+525
+198
+558
 random-serendipity
 random-serendipity
 0
@@ -1226,10 +1289,10 @@ NIL
 HORIZONTAL
 
 SWITCH
-1347
-654
-1500
-687
+1426
+670
+1579
+703
 deposit-pheromone
 deposit-pheromone
 0
@@ -1237,10 +1300,10 @@ deposit-pheromone
 -1000
 
 SWITCH
-1515
-655
-1642
-688
+1594
+671
+1721
+704
 memory-on
 memory-on
 1
@@ -1248,10 +1311,10 @@ memory-on
 -1000
 
 SWITCH
-1345
-698
-1501
-731
+1424
+714
+1580
+747
 mechanical-recruit
 mechanical-recruit
 0
@@ -1259,10 +1322,10 @@ mechanical-recruit
 -1000
 
 SWITCH
-1515
-698
-1644
-731
+1594
+714
+1723
+747
 chemical-recruit
 chemical-recruit
 0
@@ -1270,21 +1333,21 @@ chemical-recruit
 -1000
 
 SWITCH
-1516
-741
-1646
-774
+1595
+757
+1725
+790
 serendipity-on
 serendipity-on
-0
+1
 1
 -1000
 
 SWITCH
-1345
-741
-1503
-774
+1424
+757
+1582
+790
 return-nest-direct
 return-nest-direct
 0
@@ -1292,20 +1355,20 @@ return-nest-direct
 -1000
 
 TEXTBOX
-1349
-631
-1499
-649
+1428
+647
+1578
+665
 Mechanism Activation
 11
 0.0
 1
 
 MONITOR
-1547
-493
-1656
-538
+1626
+509
+1735
+554
 memory-switches
 memory-switches
 17
@@ -1313,10 +1376,10 @@ memory-switches
 11
 
 PLOT
-22
-674
-222
-824
+24
+286
+224
+436
 colony enegy
 NIL
 NIL
@@ -1328,39 +1391,40 @@ true
 false
 "" ""
 PENS
-"default" 1.0 0 -955883 true "plotxy ticks / 10 sum [energy] of Ants" "plotxy ticks / 10 sum [energy] of Ants"
-"pen-1" 1.0 0 -13840069 true "" "food-collected * 300"
+"energy" 1.0 0 -955883 true "plotxy ticks / 10 sum [energy] of Ants" "plotxy ticks / 30 sum [energy] of Ants"
+"collectedfood" 1.0 0 -13840069 true "" "plotxy ticks / 30 food-collected * 200"
+"available-food" 1.0 0 -5825686 true "" "plotxy ticks / 30 count (patches with [food?]) *  50"
 
 SLIDER
-1348
-571
-1520
-604
+1427
+587
+1599
+620
 ticks-per-day
 ticks-per-day
 0
 172800
-172800.0
+100.0
 1
 1
 NIL
 HORIZONTAL
 
 TEXTBOX
-1353
-546
-1503
-564
+1432
+562
+1582
+580
 day length in ticks
 11
 0.0
 1
 
 MONITOR
-1648
-563
-1758
-608
+1727
+579
+1837
+624
 amount-collected
 food-collected-day
 17
@@ -1368,10 +1432,10 @@ food-collected-day
 11
 
 MONITOR
-1542
-564
-1629
-609
+1621
+580
+1708
+625
 elapsed-days
 elapsed-days
 17
@@ -1379,10 +1443,10 @@ elapsed-days
 11
 
 MONITOR
-1783
-567
-1861
-612
+1745
+511
+1823
+556
 energy-avg
 energy-avg
 3
@@ -1390,19 +1454,40 @@ energy-avg
 11
 
 SLIDER
-258
-526
-295
-733
+25
+441
+263
+474
 ant-speed
 ant-speed
 0.01
 0.1
-0.08
+0.07
 0.01
 1
 m/s
-VERTICAL
+HORIZONTAL
+
+PLOT
+231
+286
+431
+436
+ants by food type
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"pen-1" 1.0 0 -2674135 true "" "plotxy ticks count ants with [f-type-memory = 1]"
+"pen-2" 1.0 2 -13840069 true "" "plotxy ticks count ants with [f-type-memory = 2]"
+"pen-3" 1.0 2 -6459832 true "" "plotxy ticks count ants with [f-type-memory = 3]"
+"pen-4" 1.0 2 -1184463 true "" "plotxy ticks count ants with [f-type-memory = 4]"
 
 @#$#@#$#@
 ## WHAT IS IT?
