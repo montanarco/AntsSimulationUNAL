@@ -317,11 +317,8 @@ to global-measures
   if days-comparator != elapsed-days ;; the time frame defined has change this estimates the amount collected during that frame
   [
     set food-collected-day food-collected
-    print word "food-collected-day: " food-collected-day
     set energy-collected-day energy-collected
-    print word "energy-collected-day: " energy-collected-day
     set energy-avg energy-collected-day / food-collected-day
-    print word "energy-avg: " energy-avg
     set food-collected 0
     set energy-collected 0
   ]
