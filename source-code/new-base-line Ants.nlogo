@@ -23,6 +23,7 @@ globals [
   energy-collected      ;; total quantity of collected energy
   elapsed-days          ;; a tiem frame is requiere to measure the amount collected
   energy-avg            ;; o	Average amount of energy per unit of food collected
+  patches-per-tick      ;; number of patches the ants move in a tick
 ]
 
 breed [ants ant]        ;; ants breed is declared
@@ -80,6 +81,15 @@ to setup
   reset-ticks
   stop-inspecting-dead-agents
   if trace? [ inspect ant 0 ]
+  calculate-speed-per-tick
+end
+
+to calculate-speed-per-tick
+  ;; calculate the number of patches to move per tick
+  let ticks-per-second ticks-per-day / 86400
+  let meters-per-patch 20 / world-height
+  let patches-per-second  meters-per-patch / ant-speed
+  set patches-per-tick patches-per-second / ticks-per-second
 end
 
 to nest-location
@@ -409,7 +419,7 @@ to search
       ]
     ]
   ]
-  fd 1
+  move-forward
   set steps steps + 1
 end
 
@@ -506,7 +516,7 @@ to follow-ant
     face min-one-of nearby-leaders [distance myself] ;; then face the one closest to myself	
     if not can-move? 1
     [ rt random 180 ]
-    fd 1	
+    move-forward	
     set loss-count loss-count + 1	
     if(loss-count > 100)	[
       set state "searching"	
@@ -599,7 +609,7 @@ to recruit
   ][
    set pheromone-recruit pheromone-recruit + 50
     recruit-circles
-    fd 1
+    move-forward
   ]
   stop
 end
@@ -738,7 +748,7 @@ to return-to-nest
     ]
   ]
   [wiggle]
-  fd 1
+  move-forward
 end
 
 ;; @**********@ agent method @**********@ ;;	
@@ -787,7 +797,7 @@ to-report diffusion [pheromone]
   report item (pheromone - 1) pheromones-diffusion
 end
 
-;; @**********@ Waypoints helper methods @**********@ ;;	
+;; @**********@ Movement helper methods @**********@ ;;	
 
 ;; @**********@ agent method @**********@ ;;	
 to-report waypoint-x
@@ -832,15 +842,20 @@ to change-last-waypoint [x y]
   let last-index ( length memory-waypoints ) - 1
   set memory-waypoints replace-item last-index memory-waypoints ( list x y )
 end
+
+;; @**********@ agent method @**********@ ;;	
+to move-forward
+  fd patches-per-tick
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 358
 10
-1312
-776
+1310
+775
 -1
 -1
-3.77
+3.7612
 1
 10
 1
@@ -1191,7 +1206,7 @@ SWITCH
 655
 fixed-food?
 fixed-food?
-1
+0
 1
 -1000
 
@@ -1261,7 +1276,7 @@ SWITCH
 774
 serendipity-on
 serendipity-on
-1
+0
 1
 -1000
 
@@ -1324,8 +1339,8 @@ SLIDER
 ticks-per-day
 ticks-per-day
 0
-50000
-955.0
+172800
+172800.0
 1
 1
 NIL
@@ -1373,6 +1388,21 @@ energy-avg
 3
 1
 11
+
+SLIDER
+258
+526
+295
+733
+ant-speed
+ant-speed
+0.01
+0.1
+0.08
+0.01
+1
+m/s
+VERTICAL
 
 @#$#@#$#@
 ## WHAT IS IT?
