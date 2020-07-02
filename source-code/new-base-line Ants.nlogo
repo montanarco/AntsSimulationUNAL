@@ -26,8 +26,8 @@ globals [
   energy-collected      ;; total quantity of collected energy
   elapsed-days          ;; a tiem frame is requiere to measure the amount collected
   energy-avg            ;; o	Average amount of energy per unit of food collected
-  patches-per-tick      ;; number of patches the ants move in a tick
   trail-patches         ;; number of patches that have enough chemical to be considered a trail
+  debug                 ;; stop the execution for debugging
 ]
 
 breed [ants ant]        ;; ants breed is declared
@@ -88,7 +88,6 @@ to setup
   if trace? [ inspect ant 0 ]
   carefully [file-delete "temp.txt"] []
   prepare-csv-file
-  ;;calculate-speed-per-tick
 end
 
 to prepare-csv-file
@@ -121,14 +120,6 @@ to writeListToFile [#mylist #fname]
     file-print ?
   ]
   file-close
-end
-
-to calculate-speed-per-tick
-  ;; calculate the number of patches to move per tick
-  let ticks-per-second ticks-per-day / 86400
-  let meters-per-patch 20 / world-height
-  let patches-per-second  meters-per-patch / ant-speed
-  set patches-per-tick patches-per-second / ticks-per-second
 end
 
 to nest-location
@@ -358,6 +349,10 @@ to go
   ;; And diffuse it
   diffuse food-scent 0.3
   tick
+
+  if debug [
+    stop
+  ]
 end
 
 to global-measures
@@ -436,11 +431,11 @@ to hold
   stop
 end
 
-	;; @**********@ agent method @**********@ ;;
+;; @**********@ agent method @**********@ ;;
 to search
   set color red
   ;; Food has been found and we are not trying to explore different sources, proceed to exploiting state
-  if (food? OR food-scent > 0.1) AND ( ( serendipity > 0 AND food? AND f-memory != feedernumber ) OR ( serendipity <= 0 AND f-memory = feedernumber ) ) [
+  if should-exploit? [
     set serendipity 0
     set energy 100
     set state "exploiting"
@@ -478,6 +473,20 @@ to search
   set steps steps + 1
 end
 
+;; @**********@ agent method @**********@ ;;
+to-report should-exploit?
+  ;; Checks if the ant should transition to the exploit status
+  ;; If we are not in a food location or perceive food scent, do not transition
+  if not food? OR food-scent < 0.1 [ report False ]
+  ;; If we are not looking for a new food source and arrive at our prefered food source, exploit!
+  if serendipity <= 0 AND f-memory = feedernumber [ report True ]
+  ;; we should also exploit if we find a new food source while looking for one
+  if serendipity > 0 AND f-memory != feedernumber [ report True ]
+  ;; If we get here this is the first food souce found by the ant, exploit!
+  report True
+end
+
+;; @**********@ agent method @**********@ ;;
 to record-food-location
   set f-memory feedernumber
   set f-type-memory food-type
@@ -486,6 +495,7 @@ to record-food-location
   set memory-y ycor
 end
 
+;; @**********@ agent method @**********@ ;;
 to decrease-serendipity
   ;; No serendipity, nothing to do here
   if serendipity = 0 [
@@ -625,10 +635,10 @@ to exploit
         ]
       ][
         ;; The ant consumes the food unless it is honeydew
-        ;;if food-type != 4 [
+        if food-type != 4 [
           set food? false	
           set food-type 0
-        ;;]
+        ]
         set loaded? true	
         set load-type food-type
       ]
@@ -736,7 +746,7 @@ end
 to try-stray-from-path
   let random-draw random-float 1
   ;; Only stray if there is no serendipity and we are either at this ant selected memory source or pheromone trail
-  if serendipity = 0 AND random-draw < stray-probability AND ( chemical-return > 0.1 OR f-memory = feedernumber ) [
+  if f-memory != 0 AND serendipity = 0 AND random-draw < stray-probability AND ( chemical-return > 0.1 OR f-memory = feedernumber ) [
     ;; Save the previous path
     set memory-old-waypoints memory-waypoints
     set memory-old-next memory-next
@@ -815,7 +825,7 @@ end
 
 ;; @**********@ agent method @**********@ ;;	
 to go-last-food-source	
-  ifelse 	serendipity-on[
+  ifelse serendipity-on [
     ifelse (distancexy waypoint-x waypoint-y) > 1	
     [
 
@@ -907,18 +917,17 @@ end
 
 ;; @**********@ agent method @**********@ ;;	
 to move-forward
-  ;;fd patches-per-tick
   fd 1
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-437
-26
-1389
-791
+383
+15
+1394
+827
 -1
 -1
-3.7612
+4.0
 1
 10
 1
@@ -973,10 +982,10 @@ NIL
 BUTTON
 113
 100
-176
+192
 133
-NIL
 go
+set debug False\ngo
 T
 1
 T
@@ -996,7 +1005,7 @@ ran-seed
 ran-seed
 0
 10000
-8345.0
+6369.0
 1
 1
 NIL
@@ -1052,7 +1061,7 @@ seeds
 seeds
 0
 200
-27.0
+11.0
 1
 1
 NIL
@@ -1067,7 +1076,7 @@ bugs
 bugs
 0
 100
-11.0
+6.0
 1
 1
 NIL
@@ -1082,7 +1091,7 @@ dead-bugs
 dead-bugs
 0
 100
-6.0
+7.0
 1
 1
 NIL
@@ -1097,7 +1106,7 @@ honeydew
 honeydew
 0
 20
-6.0
+14.0
 1
 1
 NIL
@@ -1151,7 +1160,7 @@ INPUTBOX
 1701
 350
 pheromone-diffusion-rates
-[ 2 1 100 ]
+[ 2 0 100 ]
 1
 0
 String
@@ -1162,7 +1171,7 @@ INPUTBOX
 1697
 422
 pheromone-evaporation-rates
-[ 5 0.1 20 ]
+[ 5 0.01 20 ]
 1
 0
 String
@@ -1306,7 +1315,7 @@ SWITCH
 704
 memory-on
 memory-on
-1
+0
 1
 -1000
 
@@ -1339,7 +1348,7 @@ SWITCH
 790
 serendipity-on
 serendipity-on
-1
+0
 1
 -1000
 
@@ -1403,8 +1412,8 @@ SLIDER
 ticks-per-day
 ticks-per-day
 0
-172800
-100.0
+1000
+300.0
 1
 1
 NIL
