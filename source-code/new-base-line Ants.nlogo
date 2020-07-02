@@ -8,9 +8,11 @@ globals [
   filename
   nest-xcor
   nest-ycor
+  ;; trails
   pheromones-diffusion
   pheromones-evaporation
   pheromones-help-evaporation
+  ;; memory
   last-feedernumber
   MemoryArray
   honeyDewLoc
@@ -20,14 +22,25 @@ globals [
   lstDeadBugsLoc
   DeadBugsLoc
   memory-switches       ;; global counter to indicate how many times ants have change food-location memory
+  ;; measures
+  elapsed-days          ;; a tiem frame is requiere to measure the amount collected
   food-collected-day    ;; how many food is collected by day
   food-collected        ;; total quantity of  collected food
   energy-collected-day  ;; how many energy is collected by day
   energy-collected      ;; total quantity of collected energy
-  elapsed-days          ;; a tiem frame is requiere to measure the amount collected
-  energy-avg            ;; o	Average amount of energy per unit of food collected
+  energy-units          ;; protein units
+  energy-avg            ;; o	Average amount of energy per unit of energy collected
+  protein-colleted-day  ;; how many protein is collected by day
+  protein-colleted      ;; total quantity of collected protein
+  protein-units         ;; protein units
+  protein-avg           ;; o	Average amount of protein per unit of protein collected
   trail-patches         ;; number of patches that have enough chemical to be considered a trail
   debug                 ;; stop the execution for debugging
+  maxNutritionalValue   ;; the value food quality from the food source with best quality
+  antsFTSeed-count      ;; number of ants that are collecting seeds
+  antsFTBug-count       ;; number of ants that are collecting bugs
+  antsFTDeadBug-count   ;; number of ants that are collecting dead bugs
+  antsFTHoneyDew-count  ;; number of ants that are collecting hobey dews
 ]
 
 breed [ants ant]        ;; ants breed is declared
@@ -100,7 +113,7 @@ to prepare-csv-file
       file-delete filename
      ]
      file-open filename
-  writeCSVrow filename  ["day" "energy-collected-day" "trail-patches" "food-collected-day" "energy-avg" "antsFTSeed" "antsFTBug" "antsFTDeadbug" "antsFTHoneydew" "antsSearching" "antsFollowing" "antsExploiting" "antsExploit-bug" "antsRecruiting" "foodAvailable"]
+  writeCSVrow filename  ["day" "energy-collected-day" "protein-colleted-day" "food-collected-day" "energy-avg" "protein-avg" "trail-patches" "antsFTSeed" "antsFTBug" "antsFTDeadbug" "antsFTHoneydew" "antsSearching" "antsFollowing" "antsExploiting" "antsExploit-bug" "antsRecruiting" "foodAvailable"]
 end
 
 to writeCSVrow [#fname #vals]
@@ -132,8 +145,18 @@ end
 
 to setup-globals
   set food-collected 0
+  set energy-units 1
+  set protein-units 1
+  set maxNutritionalValue 0
   set energy-collected 0
+  set protein-colleted-day 0
   set trail-patches 0
+
+  set antsFTSeed-count 0
+  set antsFTBug-count 0
+  set antsFTDeadBug-count 0
+  set antsFTHoneyDew-count 0
+
   set MemoryArray array:from-list
     [
      0  0.469879518  0.759036145  0.879518072  0.88  0.9375  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  0  0.3095  0.38  0.558255284  0.8145  0.8524  0.9204  0.913040429  0.9527  0.984  1  1  1  1  1  1  1  1  1  1  1  1  0  0.15942029  0.434782609  0.463768116  0.768115942  0.710144928  0.803030303  0.852459016  0.87037037  0.952380952  1  0.961538462  1  1  1  1  1  1  1  1  1  1  0  0.1849  0.2888  0.346276625  0.6193  0.7182  0.8176  0.843085381  0.8929  0.944  0.9638  0.9844  1  1  1  1  1  1  1  1  1  1  0  0.014492754  0.173913043  0.304347826  0.565217391  0.753623188  0.823529412  0.830769231  0.919354839  0.960784314  0.973684211  1  1  1  1  1  1  1  1  1  1  1  0  0  0.1274  0.261876361  0.4665  0.6048  0.7308  0.804676029  0.8451  0.912  0.9292  0.9694  0.99  1  1  1  1  1  1  1  1  1  0  0  0.083  0.235488639  0.406  0.5559  0.6934  0.790536967  0.8257  0.899  0.9134  0.9634  0.98  1  1  1  1  1  1  1  1  1  0  0  0.058  0.214789728  0.3561  0.5122  0.66  0.778490127  0.8093  0.888  0.8986  0.9584  0.97  1  1  1  1  1  1  1  1  1  0  0  0.0488  0.198047525  0.3168  0.4737  0.6306  0.768016533  0.7959  0.879  0.8848  0.9544  0.96  1  1  1  1  1  1  1  1  1  0  0  0.033333333  0.152542373  0.237288136  0.389830508  0.593220339  0.745762712  0.762711864  0.842105263  0.833333333  0.921568627  0.95  1  1  1  1  1  1  1  1  1  0  0  0.035  0.172473727  0.27  0.4123  0.5838  0.750495857  0.7781  0.867  0.8602  0.9494  0.95  1  1  1  1  1  1  1  1  1  0  0  0.036  0.162437625  0.2625  0.3894  0.5664  0.743023611  0.7737  0.864  0.8494  0.9484  0.95  1  1  1  1  1  1  1  1  1  0  0  0.037  0.153721828  0.2656  0.3717  0.553  0.736215526  0.7723  0.863  0.8396  0.9484  0.948  1  1  1  1  1  1  1  1  1  0  0  0.038  0.146069752  0.2793  0.3592  0.5436  0.729967851  0.7739  0.864  0.8308  0.9494  0.946  1  1  1  1  1  1  1  1  1  0  0.013157895  0.039473684  0.157894737  0.328947368  0.355263158  0.539473684  0.736842105  0.776315789  0.864864865  0.826086957  0.95  0.944444444  1  1  1  1  1  1  1  1  1
@@ -248,15 +271,25 @@ to spawn-food-sources [ftype number-of-sources probability]
       ;; Get the patch for the center of the food source
       ask patch x-coord y-coord [
         ;; Find the patches around the center and set them as food
-        ask patches in-radius food-size [
-          set food-type ftype
-          set feedernumber last-feedernumber
-          set food? food? OR (distancexy x-coord y-coord) < food-size ;; This condition is required to make sources round, can be replaced with true
-          set nutritionalQuality ((random 10) + 1) * ftype
-        ]
+        spread-food ftype last-feedernumber x-coord y-coord food-size
       ]
     ]
   ]
+end
+
+to spread-food [ftype last-feed-num x-coord y-coord food-size]
+  let nutriQuality 0
+  ifelse ftype = 3
+    [set nutriQuality one-of[ 20 40 60 ]
+    print word "nutriQuality: " nutriQuality]
+    [set nutriQuality ((random 10) + 1) * ftype]
+  ask patches in-radius food-size [
+    set food-type ftype
+    set feedernumber last-feed-num
+    set food? food? OR (distancexy x-coord y-coord) < food-size ;; This condition is required to make sources round, can be replaced with true
+    set nutritionalQuality nutriQuality
+    if maxNutritionalValue < nutritionalQuality [set maxNutritionalValue nutritionalQuality]
+    ]
 end
 
 to locate-fix-food [ftype coordarray numfood food-size]
@@ -269,12 +302,7 @@ to locate-fix-food [ftype coordarray numfood food-size]
       ;; Get the patch for the center of the food source
       ask patch x-coord y-coord [
         ;; Find the patches around the center and set them as food
-        ask patches in-radius food-size [
-          set food-type ftype
-          set feedernumber last-feedernumber
-          set food? food? OR (distancexy x-coord y-coord) < food-size ;; This condition is required to make sources round, can be replaced with true
-          set nutritionalQuality ((random 10) + 1) * ftype
-        ]
+        spread-food ftype last-feedernumber x-coord y-coord food-size
       ]
     set contador contador + 2
   ]
@@ -286,10 +314,21 @@ to recolor-patch
   ifelse nest?
   [ set pcolor violet ]
   [ifelse food? [
-      if food-type = 1 [ set pcolor orange ] ;; seed
+      if food-type = 1 [ set pcolor blue ] ;; seed
       if food-type = 2 [ set pcolor green ] ;; bug
       if food-type = 3 [ set pcolor brown ] ;; dead bugs
-      if food-type = 4 [ set pcolor yellow ] ;; honeydew
+      if food-type = 4 [ set pcolor yellow ];; honeydew
+      ;[
+       ;set pcolor (ifelse-value
+        ;nutritionalQuality = 20 [ yellow ]
+        ;nutritionalQuality = 40 [ orange ]
+        ;nutritionalQuality = 60 [ red ]
+        ;[ black ]
+      ;)
+        ;;if nutritionalQuality = 20 [ set pcolor yellow ]
+        ;;if nutritionalQuality = 40 [ set pcolor orange ]
+        ;;if nutritionalQuality = 60 [ set pcolor red ]
+      ;]
     ] [
       ;; If there is food-scent, show it
       set pcolor scale-color pink food-scent 0.1 20
@@ -361,26 +400,37 @@ to global-measures
   if days-comparator != elapsed-days ;; the time frame defined has change this estimates the amount collected during that frame
   [
     set food-collected-day precision food-collected 3
-    print word "food-collected-day: " food-collected-day
     set energy-collected-day precision energy-collected 3
-    print word "energy-collected-day: " energy-collected-day
-    set energy-avg precision (energy-collected-day / food-collected-day) 3
-    print word "energy-avg: " precision (energy-avg) 3
+    set protein-colleted-day precision protein-colleted 3
+    set energy-avg precision (energy-collected-day / energy-units) 3
+    set protein-avg precision (protein-colleted-day / protein-units) 3
     set trail-patches count patches with [ chemical-return > 0.5]
-    print word "trail-patches: " trail-patches
     set food-collected 0
+    set energy-units 1
+    set protein-units 1
     set energy-collected 0
-    let antsFTSeed count ants with [f-type-memory = 1]
-    let antsFTBug count ants with [f-type-memory = 2]
-    let antsFTDeadbug count ants with [f-type-memory = 3]
-    let antsFTHoneydew count ants with [f-type-memory = 4]
+    set protein-colleted 0
+
+    let antsFTSeed precision (antsFTSeed-count / ticks-per-day) 3
+    let antsFTBug precision (antsFTBug-count / ticks-per-day) 3
+    let antsFTDeadbug precision (antsFTDeadbug-count / ticks-per-day) 3
+    let antsFTHoneydew precision (antsFTHoneydew-count / ticks-per-day) 3
+    set antsFTSeed-count 0
+    set antsFTBug-count 0
+    set antsFTDeadbug-count 0
+    set antsFTHoneydew-count 0
+
+    ;;let antsFTSeed count ants with [f-type-memory = 1]
+    ;;let antsFTBug count ants with [f-type-memory = 2]
+    ;;let antsFTDeadbug count ants with [f-type-memory = 3]
+    ;;let antsFTHoneydew count ants with [f-type-memory = 4]
     let antsSearching count ants with [state = "searching"]
     let antsFollowing count ants with [state = "following"]
     let antsExploiting count ants with [state = "exploiting"]
     let antsExploit-bug count ants with [state = "exploit-bug"]
     let antsRecruiting count ants with [state = "recruiting"]
     let foodAvailable count patches with [food?]
-    writeCSVrow filename  (list elapsed-days energy-collected-day trail-patches food-collected-day energy-avg antsFTSeed antsFTBug antsFTDeadbug antsFTHoneydew antsSearching antsFollowing antsExploiting antsExploit-bug antsRecruiting foodAvailable)
+    writeCSVrow filename  (list elapsed-days energy-collected-day protein-colleted-day food-collected-day energy-avg protein-avg trail-patches antsFTSeed antsFTBug antsFTDeadbug antsFTHoneydew antsSearching antsFollowing antsExploiting antsExploit-bug antsRecruiting foodAvailable)
   ]
 end
 
@@ -437,7 +487,7 @@ to search
   ;; Food has been found and we are not trying to explore different sources, proceed to exploiting state
   if should-exploit? [
     set serendipity 0
-    set energy 100
+    set energy energy + ((nutriQuality-memory / maxNutritionalValue) * 100)
     set state "exploiting"
     stop
   ]
@@ -519,7 +569,6 @@ to do-memstrength
      ;;if it finds a different, productive feeder it sets newfeedermemstrength 1 higher.
      ;;The probability of memory switching is governed by the relationship between memstrength and newfeedermemstrength
      ;;The ants look up the probability in a lookup table called MemoryArray
-  ;;show word "do-memstrength" 1
 
   if memstrength > max-memory [set memstrength max-memory]  ;sets a maximum memory strength, as defined by a slider in the interface tab
   if newfeedermemstrength > 23 [set newfeedermemstrength 22]  ;prevents the newmemstrength to get above 22, as the look up table doesn't go higher than that
@@ -532,6 +581,7 @@ to do-memstrength
       [
       if nutriQuality-memory < nutritionalQuality  ;; if the ant rembers having food a more nutritive food source then he wont chance the preference, but if he founs a more nutritional one he well change his mind acording to the quality
         [set newfeedermemstrength newfeedermemstrength + floor(nutritionalQuality / 10 ) ]
+
         SwitchNow?
       ]
   ]
@@ -550,17 +600,14 @@ end
 
 to SwitchNow?
     if random-float 1 > SwitchChance memstrength newfeedermemstrength [switch-memory]           ;;;takes a random floating-point number between 0 and 1. If the number is bigger than the chance of memory switching, memory reset happens
-    ;;show word "SwitchNow?" 1
 End
 
 
 to-report SwitchChance [CurrentMemStrength CurrentNewFeederMemStrength]
-   ;;show word "SwitchChance" 1
   report array:item MemoryArray (min list (((CurrentMemStrength - 1) * 22) + CurrentNewFeederMemStrength) (array:length MemoryArray - 1) )
 end
 
 to switch-memory       ;;;this  resets the ants memory: it now acts as if it is finding the new feeder it is on for the first time. In effect it switches its favoured feeder to this new feeder
-  ;;show word "switch-memory" 1
   set memstrength 1
   set newfeedermemstrength 0
   set f-memory 0
@@ -618,7 +665,7 @@ to exploit
     ;; Is there food? ->  Grab it	
     if food? [	
       if memory-on [ do-memstrength ]
-      set energy energy + (10 * food-type)
+      set energy energy + ((nutriQuality-memory / maxNutritionalValue) * 100)
       if energy > 100  [set energy 100]
       record-food-location
       ifelse (food-type = 3) [
@@ -651,8 +698,17 @@ end
 
 to update-instant-measures
   set food-collected food-collected + 1 ;; if the ant is loaded ans arrives to the nest then he has collected a food unit
-  set energy-collected energy-collected + nutriQuality-memory ;; if the ant is loaded ans arrives to the nest then he has collected a food unit
 
+  ifelse f-type-memory = 3
+  [set energy-collected energy-collected + nutriQuality-memory
+   set energy-units energy-units + 1] ;; if the ant is loaded ans arrives to the nest then he has collected a food unit
+  [set protein-colleted protein-colleted + nutriQuality-memory
+   set protein-units protein-units + 1]
+
+  set antsFTSeed-count ( antsFTSeed-count + count ants with [f-type-memory = 1] )
+  set antsFTBug-count ( antsFTSeed-count + count ants with [f-type-memory = 2] )
+  set antsFTDeadBug-count ( antsFTSeed-count + count ants with [f-type-memory = 3] )
+  set antsFTHoneyDew-count ( antsFTSeed-count + count ants with [f-type-memory = 4] )
 end
 
 to-report measure-bug
@@ -701,7 +757,6 @@ to exploiting-bug
       set food-scent 0
       ]
       set loaded? false	
-      ;;set food-collected food-collected + 1 ;; the ant was loaded and arrived to the nest so the amount of food increase
       set state "searching"
     ]
     [ return-to-nest ]
@@ -923,8 +978,8 @@ end
 GRAPHICS-WINDOW
 383
 15
-1394
-827
+1395
+828
 -1
 -1
 4.0
@@ -1005,7 +1060,7 @@ ran-seed
 ran-seed
 0
 10000
-6369.0
+6370.0
 1
 1
 NIL
@@ -1061,7 +1116,7 @@ seeds
 seeds
 0
 200
-11.0
+16.0
 1
 1
 NIL
@@ -1076,7 +1131,7 @@ bugs
 bugs
 0
 100
-6.0
+12.0
 1
 1
 NIL
@@ -1091,7 +1146,7 @@ dead-bugs
 dead-bugs
 0
 100
-7.0
+15.0
 1
 1
 NIL
@@ -1106,7 +1161,7 @@ honeydew
 honeydew
 0
 20
-14.0
+8.0
 1
 1
 NIL
@@ -1401,8 +1456,10 @@ false
 "" ""
 PENS
 "energy" 1.0 0 -955883 true "plotxy ticks / 10 sum [energy] of Ants" "plotxy ticks / 30 sum [energy] of Ants"
-"collectedfood" 1.0 0 -13840069 true "" "plotxy ticks / 30 food-collected * 200"
-"available-food" 1.0 0 -5825686 true "" "plotxy ticks / 30 count (patches with [food?]) *  50"
+"collectedfood" 1.0 0 -13840069 true "" "plotxy ticks / 30 food-collected * 300"
+"available-food" 1.0 0 -5825686 true "" "plotxy ticks / 30 count (patches with [food?]) * 20"
+"collectedenergy" 1.0 0 -13791810 true "" "plotxy ticks / 30 energy-collected * 20"
+"collectedprotein" 1.0 0 -15637942 true "" "plotxy ticks / 30 protein-colleted * 20"
 
 SLIDER
 1427
@@ -1413,7 +1470,7 @@ ticks-per-day
 ticks-per-day
 0
 1000
-300.0
+150.0
 1
 1
 NIL
@@ -1493,7 +1550,7 @@ true
 false
 "" ""
 PENS
-"pen-1" 1.0 0 -2674135 true "" "plotxy ticks count ants with [f-type-memory = 1]"
+"pen-1" 1.0 2 -2674135 true "" "plotxy ticks count ants with [f-type-memory = 1]"
 "pen-2" 1.0 2 -13840069 true "" "plotxy ticks count ants with [f-type-memory = 2]"
 "pen-3" 1.0 2 -6459832 true "" "plotxy ticks count ants with [f-type-memory = 3]"
 "pen-4" 1.0 2 -1184463 true "" "plotxy ticks count ants with [f-type-memory = 4]"

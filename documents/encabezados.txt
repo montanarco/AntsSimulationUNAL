@@ -1,0 +1,17 @@
+day	
+energy-collected-day	
+protein-colleted-day		
+food-collected-day	
+protein-avg	
+energy-avg	
+trail-patches	
+antsFTSeed	
+antsFTBug	
+antsFTDeadbug	
+antsFTHoneydew	
+antsSearching	
+antsFollowing	
+antsExploiting	
+antsExploit-bug	
+antsRecruiting	
+foodAvailable
