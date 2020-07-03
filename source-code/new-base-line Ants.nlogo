@@ -501,7 +501,7 @@ to search
     ifelse serendipity = 0 AND f-memory != 0 [
       go-last-food-source
       ;; Stray the ant from the direct route to the food with a probability setting its serendipity to ignore trails
-      if serendipity-on [try-stray-from-path]
+      try-stray-from-path
     ]
     [
       ;; Otherwise follow a pheromone or just search at random
@@ -511,7 +511,7 @@ to search
         ifelse serendipity = 0 and (chemical-return >= 0.05) and (chemical-return < 2) [   ;; original mecanism of pheromone following
           join-chemical "chemical"
           ;; Stray the ant from the pheromone trail with a probability setting its serendipity to ignore trails
-          if serendipity-on [try-stray-from-path]
+          try-stray-from-path
         ] [
           wiggle
           decrease-serendipity
@@ -599,7 +599,8 @@ to do-memstrength
 end
 
 to SwitchNow?
-    if random-float 1 > SwitchChance memstrength newfeedermemstrength [switch-memory]           ;;;takes a random floating-point number between 0 and 1. If the number is bigger than the chance of memory switching, memory reset happens
+  if not memory-on [ stop ]
+  if random-float 1 > SwitchChance memstrength newfeedermemstrength [switch-memory]           ;;;takes a random floating-point number between 0 and 1. If the number is bigger than the chance of memory switching, memory reset happens
 End
 
 
@@ -664,7 +665,7 @@ to exploit
     ;; We are not loaded, so we should try to grab food	
     ;; Is there food? ->  Grab it	
     if food? [	
-      if memory-on [ do-memstrength ]
+      do-memstrength
       set energy energy + ((nutriQuality-memory / maxNutritionalValue) * 100)
       if energy > 100  [set energy 100]
       record-food-location
@@ -799,6 +800,7 @@ end
 
 ;; @**********@ patch procedure @**********@ ;;
 to try-stray-from-path
+  if not serendipity-on [ stop ]
   let random-draw random-float 1
   ;; Only stray if there is no serendipity and we are either at this ant selected memory source or pheromone trail
   if f-memory != 0 AND serendipity = 0 AND random-draw < stray-probability AND ( chemical-return > 0.1 OR f-memory = feedernumber ) [
@@ -843,36 +845,22 @@ end
 
 ;; @**********@ agent method @**********@ ;;
 to return-to-nest
-  ifelse return-nest-direct
-  [
-    ifelse serendipity-on[
-      if load-type != 1 or load-type != 3 [ ;; if we are harvesting seeds or bug there is no need to leave a pheromene trail
-        if deposit-pheromone
-        ;;[set chemical-return chemical-return + ( 0.03 * load-type)]
-        [ set chemical-return chemical-return + (0.002 * nutriQuality-memory)] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
-        set leader false
-      ]
-      ;; this is to say that the ant has memory of nest location so it heads toward the next to return
-      ;; this method should be canged for a path integration method
-      if (distancexy waypoint-x waypoint-y) < 3.0 [
-        ;; We arrieved at the waypoint, go to the next one if we not on the nest
-        set-previous-waypoint
-      ]
-      facexy waypoint-x waypoint-y
-      if not can-move? 1
-      [ rt 180 ]
+  ifelse return-nest-direct [
+    if load-type != 1 or load-type != 3 [ ;; if we are harvesting seeds or bug there is no need to leave a pheromene trail
+      if deposit-pheromone
+      ;;[set chemical-return chemical-return + ( 0.03 * load-type)]
+      [ set chemical-return chemical-return + (0.002 * nutriQuality-memory)] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
+      set leader false
     ]
-    [
-      if load-type != 1 or load-type != 3 [ ;; if we are harvesting seeds or bug there is no need to leave a pheromene trail
-        if deposit-pheromone
-        ;;[set chemical-return chemical-return + ( 0.03 * load-type)]
-        [ set chemical-return chemical-return + ( 0.002 * nutriQuality-memory)] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
-        set leader false
-      ]
-      facexy nest-xcor nest-ycor
-     if not can-move? 1
-     [ rt 180 ]
+    ;; this is to say that the ant has memory of nest location so it heads toward the next to return
+    ;; this method should be canged for a path integration method
+    if (distancexy waypoint-x waypoint-y) < 1.0 [
+      ;; We arrieved at the waypoint, go to the next one if we not on the nest
+      set-previous-waypoint
     ]
+    facexy waypoint-x waypoint-y
+    if not can-move? 1
+    [ rt 180 ]
   ]
   [wiggle]
   move-forward
@@ -880,35 +868,15 @@ end
 
 ;; @**********@ agent method @**********@ ;;	
 to go-last-food-source	
-  ifelse serendipity-on [
-    ifelse (distancexy waypoint-x waypoint-y) > 1	
-    [
-
-      facexy waypoint-x waypoint-y ;; if i remember where i found food I turn in food direction.	
-      if not can-move? 1
-      [ rt random 180 ]
-
-    ]	
-    [	
-      set-next-waypoint
-    ]	
-  ]
-
-  [
-    ifelse (distancexy memory-x memory-y) > 1	
-     [
-      facexy memory-x memory-y
-      if not can-move? 1
-      [ rt random 180 ]
-    ]
-    [
-      set leader false
-      set f-memory 0
-      ask ants in-radius 10 [ set state "searching" ]	
-    ]
-
-  ]
-
+  ifelse (distancexy waypoint-x waypoint-y) > 1	[
+    facexy waypoint-x waypoint-y ;; if i remember where i found food I turn in food direction.	
+    if not can-move? 1
+    [ rt random 180 ]
+  ]	[	
+    set-next-waypoint
+    set leader false
+    ask ants in-radius 10 [ set state "searching" ]
+  ]	
 end
 
 
@@ -1294,7 +1262,7 @@ stray-probability
 stray-probability
 0
 5
-5.0
+0.0
 0.01
 1
 %
