@@ -815,9 +815,9 @@ end
 ;; @**********@ agent method @**********@ ;;
 to wiggle  ;; turtle procedure
   ;; Move with less variability when getting out of the nest
-  ;;let max_angle per_step_max_rotation / (1 + (exp (-0.1 * (steps - (per_step_max_rotation / 2))) ) )
-  let ranright random 40
-  let ranleft random 40
+  let max_angle per_step_max_rotation / (1 + (exp (-0.1 * (steps - (per_step_max_rotation / 2))) ) )
+  let ranright random max_angle
+  let ranleft random max_angle
   let delta ranright - ranleft
   rt delta
   if not can-move? 1
@@ -891,7 +891,6 @@ to go-last-food-source
     ]	
     [	
       set-next-waypoint
-      ;; switch-memory
     ]	
   ]
 
@@ -1011,7 +1010,7 @@ population
 population
 1
 100
-100.0
+1.0
 1
 1
 NIL
@@ -1060,7 +1059,7 @@ ran-seed
 ran-seed
 0
 10000
-6370.0
+2357.0
 1
 1
 NIL
@@ -1075,7 +1074,7 @@ per_step_max_rotation
 per_step_max_rotation
 0
 180
-35.0
+40.0
 5
 1
 NIL
@@ -1088,7 +1087,7 @@ SWITCH
 602
 trace?
 trace?
-1
+0
 1
 -1000
 
@@ -1116,7 +1115,7 @@ seeds
 seeds
 0
 200
-16.0
+0.0
 1
 1
 NIL
@@ -1131,7 +1130,7 @@ bugs
 bugs
 0
 100
-12.0
+0.0
 1
 1
 NIL
@@ -1146,7 +1145,7 @@ dead-bugs
 dead-bugs
 0
 100
-15.0
+0.0
 1
 1
 NIL
@@ -1161,7 +1160,7 @@ honeydew
 honeydew
 0
 20
-8.0
+18.0
 1
 1
 NIL
@@ -1370,7 +1369,7 @@ SWITCH
 704
 memory-on
 memory-on
-0
+1
 1
 -1000
 
@@ -1381,7 +1380,7 @@ SWITCH
 747
 mechanical-recruit
 mechanical-recruit
-0
+1
 1
 -1000
 
@@ -1392,7 +1391,7 @@ SWITCH
 747
 chemical-recruit
 chemical-recruit
-0
+1
 1
 -1000
 
@@ -1518,21 +1517,6 @@ energy-avg
 3
 1
 11
-
-SLIDER
-25
-441
-263
-474
-ant-speed
-ant-speed
-0.01
-0.1
-0.07
-0.01
-1
-m/s
-HORIZONTAL
 
 PLOT
 231
