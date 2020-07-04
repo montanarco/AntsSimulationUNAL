@@ -68,6 +68,7 @@ ants-own [              ;; ant atributes
   memory-old-next       ;; Position of the next waypoint from the old list of waypoints
   memory-x
   memory-y
+  exploit-counter       ;; Number of ticks to remain exploiting a source before grabbing food and returning to the nest
 ]
 
 patches-own [
@@ -200,6 +201,7 @@ to setup-ants
     set memory-next 0
     set energy 50
     set f-type-memory 0
+    set exploit-counter -1
   ]
 end
 
@@ -531,7 +533,7 @@ to-report should-exploit?
   ;; If we are not looking for a new food source and arrive at our prefered food source, exploit!
   if serendipity <= 0 AND f-memory = feedernumber [ report True ]
   ;; we should also exploit if we find a new food source while looking for one
-  if serendipity > 0 AND f-memory != feedernumber [ report True ]
+  if serendipity > 0 AND f-memory = feedernumber [ report False ]
   ;; If we get here this is the first food souce found by the ant, exploit!
   report True
 end
@@ -666,37 +668,40 @@ to exploit
   ] [	
     ;; We are not loaded, so we should try to grab food	
     ;; Is there food? ->  Grab it	
-    if food? [	
+    ifelse food? [
+      if exploting-source [ stop ]
       do-memstrength
       set energy energy + ((nutriQuality-memory / maxNutritionalValue) * 100)
       if energy > 100  [set energy 100]
       record-food-location
-      ifelse (food-type = 3) [
-        ifelse chemical-recruit
-        [
-          set bug-size measure-bug          ;; see how many comrades would be needed to carry th bug
-          set state "recruiting"
-          stop
-        ]
-        [
-          set loaded? true	
-          set load-type food-type
-          set food? false
-        ]
-      ][
-        ;; The ant consumes the food unless it is honeydew
-        if food-type != 4 [
-          set food? false	
-          set food-type 0
-        ]
-        set loaded? true	
-        set load-type food-type
+      if food-type = 3 and chemical-recruit [
+        ;; The ant needs help to carry the food, lets try to recruit
+        set bug-size measure-bug          ;; see how many comrades would be needed to carry th bug
+        set state "recruiting"
+        stop
       ]
-    ]	
-    ;; Is there the scent of food? -> move towards higher concentrations of it	
-      if food-scent > 0.1	
-      [ uphill food-scent ]	
+      ;; Modify the patch and set the load of the ant
+      set loaded? true	
+      set load-type food-type
+      set food? food-type = 4 ;; Don't consume honeydew
+      set exploit-counter -1
+      if not food? [ set food-type 0 ] ;; If the food was consumed, remove the food type
+    ] [	
+      ;; Is there the scent of food? -> move towards higher concentrations of it	
+      if food-scent > 0.1	[ uphill food-scent ]	
+    ]
   ]	
+end
+
+	;; @**********@ agent method @**********@ ;;	
+to-report exploting-source
+  ;; Food sources other than honeydew are exploited instantly and we only exploit for a set number of ticks
+  if food-type != 4 or exploit-counter = 0 [ report False ]
+  ;; Initiate the exploit counter as needed
+  if exploit-counter = -1 [ set exploit-counter 10 ]
+  ;; Decrease the exploit counter
+  set exploit-counter exploit-counter - 1
+  report True
 end
 
 to update-instant-measures
@@ -982,7 +987,7 @@ population
 population
 1
 100
-100.0
+1.0
 1
 1
 NIL
@@ -1031,7 +1036,7 @@ ran-seed
 ran-seed
 0
 10000
-6.0
+12.0
 1
 1
 NIL
@@ -1059,7 +1064,7 @@ SWITCH
 602
 trace?
 trace?
-1
+0
 1
 -1000
 
@@ -1102,7 +1107,7 @@ bugs
 bugs
 0
 100
-18.0
+60.0
 1
 1
 NIL
