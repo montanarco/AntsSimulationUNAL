@@ -538,11 +538,13 @@ end
 
 ;; @**********@ agent method @**********@ ;;
 to record-food-location
-  set f-memory feedernumber
-  set f-type-memory food-type
-  set nutriQuality-memory nutritionalQuality
-  set memory-x xcor
-  set memory-y ycor
+  if food-type != 3[
+    set f-memory feedernumber
+    set f-type-memory food-type
+    set nutriQuality-memory nutritionalQuality
+    set memory-x xcor
+    set memory-y ycor
+  ]
 end
 
 ;; @**********@ agent method @**********@ ;;
@@ -731,7 +733,6 @@ to recruit
     set bug-leader true]
     [set bug-leader true]
   ][
-   set pheromone-recruit pheromone-recruit + 50
     recruit-circles
     move-forward
   ]
@@ -778,6 +779,8 @@ to join-chemical [kind]
   let scent-ahead chemical-scent-at-angle   0  kind
   let scent-right chemical-scent-at-angle  45  kind
   let scent-left  chemical-scent-at-angle -45  kind
+  ;let scent-right90 chemical-scent-at-angle  90  kind
+  ;let scent-left-90  chemical-scent-at-angle -90  kind
   if (scent-right > scent-ahead) or (scent-left > scent-ahead)
   [ ifelse scent-right > scent-left
     [ rt 45 ]
@@ -831,6 +834,7 @@ to recruit-circles
     rt 15
     if not can-move? 1
     [ rt 180 ]
+    set pheromone-recruit pheromone-recruit + 50
   ]
   [
     if(loss-count > 120)	
@@ -1060,7 +1064,7 @@ ran-seed
 ran-seed
 0
 10000
-6370.0
+6.0
 1
 1
 NIL
@@ -1116,7 +1120,7 @@ seeds
 seeds
 0
 200
-16.0
+0.0
 1
 1
 NIL
@@ -1131,7 +1135,7 @@ bugs
 bugs
 0
 100
-12.0
+18.0
 1
 1
 NIL
@@ -1146,7 +1150,7 @@ dead-bugs
 dead-bugs
 0
 100
-15.0
+0.0
 1
 1
 NIL
@@ -1161,7 +1165,7 @@ honeydew
 honeydew
 0
 20
-8.0
+0.0
 1
 1
 NIL
@@ -1359,7 +1363,7 @@ SWITCH
 703
 deposit-pheromone
 deposit-pheromone
-0
+1
 1
 -1000
 
@@ -1370,7 +1374,7 @@ SWITCH
 704
 memory-on
 memory-on
-0
+1
 1
 -1000
 
@@ -1392,7 +1396,7 @@ SWITCH
 747
 chemical-recruit
 chemical-recruit
-0
+1
 1
 -1000
 
@@ -1403,7 +1407,7 @@ SWITCH
 790
 serendipity-on
 serendipity-on
-0
+1
 1
 -1000
 
