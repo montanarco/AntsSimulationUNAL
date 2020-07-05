@@ -59,7 +59,8 @@ ants-own [              ;; ant atributes
   nutriQuality-memory   ;; related to the quality of the last food source that was found
   memstrength
   newfeedermemstrength
-  leader                ;; use to indicate other ants to follow self to be guided to the food source
+  leader?                ;; use to indicate other ants to follow self to be guided to the food source
+  my-leader              ;; id of the ant that this ant follows
   bug-size
   bug-leader
   serendipity           ;; Number of ticks for which the ant will ignore pheromone trails to look for new food sources
@@ -195,7 +196,8 @@ to setup-ants
     set fullness random max_fullness
     set memstrength 1
     set f-memory 0
-    set leader false
+    set leader? false
+    set my-leader -1
     set bug-leader false
     set load-type 0
     if trace? [ pen-down ]
@@ -503,6 +505,7 @@ end
 ;; @**********@ agent method @**********@ ;;
 to search
   set color red
+  set my-leader -1 ;; If searching, forget about a previous leader if any
   ;; Food has been found and we are not trying to explore different sources, proceed to exploiting state
   if should-exploit? [
     set serendipity 0
@@ -644,7 +647,7 @@ to follow-ant
   if loaded?	
   [ set state "exploiting"	
     stop]	
-  let nearby-leaders ants with [leader and (distance myself < 10)] ;; find nearby leaders	
+  let nearby-leaders ants with [leader? and (distance myself < 10)] ;; find nearby leaders	
   ifelse any? nearby-leaders [ ;; to avoid 'nobody'-error, check if there are any first	
     face min-one-of nearby-leaders [distance myself] ;; then face the one closest to myself	
     if not can-move? 1
@@ -664,18 +667,13 @@ end
 	;; @**********@ agent method @**********@ ;;	
 to exploit	
   set color green	
-  ifelse loaded? [	
-    ;; we have food, lets get it to the nest	
+  ifelse loaded? [
+    ;; we have food, lets get it to the nest but look for followers along the way
+    ask-for-followers
     ;; If we got to the nest -> unload food and restart searching	
     ifelse nest? [	
       set loaded? false	
       update-instant-measures
-      ;; when the ant remembers a location where it has found any food, call others to show where the food source is	
-      if mechanical-recruit
-      [
-         set leader true	
-         ask ants in-radius 5 [ set state "following" ]	
-      ]
       set state "searching"	
       stop	
     ] [	
@@ -714,6 +712,31 @@ to exploit
       [
         ;; there is no food around, get back to searching
         set state "searching"
+      ]
+    ]
+  ]
+end
+
+to ask-for-followers
+  ;; when the ant remembers a location where it has found any food, call others to show where the food source is	
+  if mechanical-recruit [
+    set leader? true
+    let followers count other ants in-radius 3 with [ state = "following" and my-leader = who ]
+    ifelse followers > 0 [
+      ;; The ant has followers, guide them to the food source instead of continue the path to the nest
+      set state "searching"
+      set-next-waypoint
+    ] [
+      let ways memory-waypoints
+      ;; No followers, ask ants around to follow
+      let available-ants other ants in-radius 3 with [ not loaded? and my-leader = -1 ]
+      if count available-ants > 1 [
+        set available-ants n-of 2 available-ants
+      ]
+      ask available-ants [
+        set state "following"
+        set memory-waypoints ways
+        set memory-next ( length ways ) - 1
       ]
     ]
   ]
@@ -881,7 +904,7 @@ to return-to-nest
       if deposit-pheromone
       ;;[set chemical-return chemical-return + ( 0.03 * load-type)]
       [ set chemical-return chemical-return + (0.002 * nutriQuality-memory)] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
-      set leader false
+      set leader? false
     ]
     ;; this is to say that the ant has memory of nest location so it heads toward the next to return
     ;; this method should be canged for a path integration method
@@ -912,7 +935,7 @@ to go-last-food-source
     ] [
       set-next-waypoint
     ]
-    set leader false
+    set leader? false
     ask ants in-radius 10 [ set state "searching" ]
   ]	
 end
@@ -1031,7 +1054,7 @@ population
 population
 1
 100
-1.0
+100.0
 1
 1
 NIL
@@ -1108,7 +1131,7 @@ SWITCH
 602
 trace?
 trace?
-0
+1
 1
 -1000
 
@@ -1121,7 +1144,7 @@ max_fullness
 max_fullness
 0
 200
-0.0
+60.0
 5
 1
 NIL
@@ -1353,7 +1376,7 @@ SWITCH
 603
 fixed-food?
 fixed-food?
-1
+0
 1
 -1000
 
