@@ -41,6 +41,7 @@ globals [
   antsFTBug-count       ;; number of ants that are collecting bugs
   antsFTDeadBug-count   ;; number of ants that are collecting dead bugs
   antsFTHoneyDew-count  ;; number of ants that are collecting hobey dews
+  countFT-ants          ;; count to search the average number of ants by food type
 ]
 
 breed [ants ant]        ;; ants breed is declared
@@ -151,6 +152,7 @@ to setup-globals
   set energy-collected 0
   set protein-colleted-day 0
   set trail-patches 0
+  set countFT-ants 0
 
   set antsFTSeed-count 0
   set antsFTBug-count 0
@@ -377,8 +379,8 @@ to go
   setup-pheromones
   diffuse-chemical
   diffuse-pheromones
+  count-ants-by-food-type
   global-measures
-
   respawn-food
 
   ;; Add the food-scent
@@ -411,19 +413,24 @@ to global-measures
     set energy-collected 0
     set protein-colleted 0
 
-    let antsFTSeed precision (antsFTSeed-count / ticks-per-day) 3
-    let antsFTBug precision (antsFTBug-count / ticks-per-day) 3
-    let antsFTDeadbug precision (antsFTDeadbug-count / ticks-per-day) 3
-    let antsFTHoneydew precision (antsFTHoneydew-count / ticks-per-day) 3
+    let antsFTSeed antsFTSeed-count / countFT-ants
+    let antsFTBug antsFTBug-count / countFT-ants
+    let antsFTDeadbug antsFTDeadbug-count / countFT-ants
+    let antsFTHoneydew antsFTHoneydew-count / countFT-ants
     set antsFTSeed-count 0
     set antsFTBug-count 0
     set antsFTDeadbug-count 0
     set antsFTHoneydew-count 0
+    set countFT-ants 0
 
-    ;;let antsFTSeed count ants with [f-type-memory = 1]
-    ;;let antsFTBug count ants with [f-type-memory = 2]
-    ;;let antsFTDeadbug count ants with [f-type-memory = 3]
-    ;;let antsFTHoneydew count ants with [f-type-memory = 4]
+    let sumft-ants (antsFTSeed + antsFTBug + antsFTDeadbug + antsFTHoneydew)
+    if sumft-ants = 0 [set sumft-ants 1]
+
+    set antsFTSeed precision (antsFTSeed / sumft-ants) 3
+    set antsFTBug precision ( antsFTBug / sumft-ants) 3
+    set antsFTDeadbug precision ( antsFTDeadbug / sumft-ants) 3
+    set antsFTHoneydew precision ( antsFTHoneydew / sumft-ants) 3
+
     let antsSearching count ants with [state = "searching"]
     let antsFollowing count ants with [state = "following"]
     let antsExploiting count ants with [state = "exploiting"]
@@ -431,6 +438,16 @@ to global-measures
     let antsRecruiting count ants with [state = "recruiting"]
     let foodAvailable count patches with [food?]
     writeCSVrow filename  (list elapsed-days energy-collected-day protein-colleted-day food-collected-day energy-avg protein-avg trail-patches antsFTSeed antsFTBug antsFTDeadbug antsFTHoneydew antsSearching antsFollowing antsExploiting antsExploit-bug antsRecruiting foodAvailable)
+  ]
+end
+
+to count-ants-by-food-type
+  if (ticks mod 20) = 0
+  [set antsFTSeed-count ( antsFTSeed-count + count ants with [f-type-memory = 1] )
+   set antsFTBug-count ( antsFTSeed-count + count ants with [f-type-memory = 2] )
+   set antsFTDeadBug-count ( antsFTSeed-count + count ants with [f-type-memory = 3] )
+   set antsFTHoneyDew-count ( antsFTSeed-count + count ants with [f-type-memory = 4] )
+   set countFT-ants countFT-ants + 1
   ]
 end
 
@@ -538,9 +555,9 @@ end
 
 ;; @**********@ agent method @**********@ ;;
 to record-food-location
+  set f-type-memory food-type
   if food-type != 3[
     set f-memory feedernumber
-    set f-type-memory food-type
     set nutriQuality-memory nutritionalQuality
     set memory-x xcor
     set memory-y ycor
@@ -707,11 +724,6 @@ to update-instant-measures
    set energy-units energy-units + 1] ;; if the ant is loaded ans arrives to the nest then he has collected a food unit
   [set protein-colleted protein-colleted + nutriQuality-memory
    set protein-units protein-units + 1]
-
-  set antsFTSeed-count ( antsFTSeed-count + count ants with [f-type-memory = 1] )
-  set antsFTBug-count ( antsFTSeed-count + count ants with [f-type-memory = 2] )
-  set antsFTDeadBug-count ( antsFTSeed-count + count ants with [f-type-memory = 3] )
-  set antsFTHoneyDew-count ( antsFTSeed-count + count ants with [f-type-memory = 4] )
 end
 
 to-report measure-bug
@@ -1031,7 +1043,7 @@ ran-seed
 ran-seed
 0
 10000
-6.0
+8.0
 1
 1
 NIL
@@ -1087,7 +1099,7 @@ seeds
 seeds
 0
 200
-0.0
+27.0
 1
 1
 NIL
@@ -1102,7 +1114,7 @@ bugs
 bugs
 0
 100
-18.0
+20.0
 1
 1
 NIL
@@ -1117,7 +1129,7 @@ dead-bugs
 dead-bugs
 0
 100
-0.0
+15.0
 1
 1
 NIL
@@ -1132,7 +1144,7 @@ honeydew
 honeydew
 0
 20
-0.0
+3.0
 1
 1
 NIL
@@ -1352,7 +1364,7 @@ SWITCH
 747
 mechanical-recruit
 mechanical-recruit
-0
+1
 1
 -1000
 
@@ -1363,7 +1375,7 @@ SWITCH
 747
 chemical-recruit
 chemical-recruit
-1
+0
 1
 -1000
 
@@ -1412,8 +1424,8 @@ memory-switches
 
 PLOT
 24
-286
-224
+312
+203
 436
 colony enegy
 NIL
@@ -1506,9 +1518,9 @@ m/s
 HORIZONTAL
 
 PLOT
-231
-286
-431
+207
+311
+373
 436
 ants by food type
 NIL
