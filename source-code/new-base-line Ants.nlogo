@@ -199,11 +199,11 @@ to setup-ants
     set bug-leader false
     set load-type 0
     if trace? [ pen-down ]
-    set memory-waypoints ( list ( list nest-xcor nest-ycor ) )
     set memory-next 0
     set energy 50
     set f-type-memory 0
     set exploit-counter -1
+    reset-waypoints
   ]
 end
 
@@ -390,7 +390,7 @@ to go
     set food-scent 20
   ]
   ;; And diffuse it
-  diffuse food-scent 0.3
+  diffuse food-scent 0.5
   tick
 
   if debug [
@@ -546,7 +546,7 @@ end
 to-report should-exploit?
   ;; Checks if the ant should transition to the exploit status
   ;; If we are not in a food location or perceive food scent, do not transition
-  if not food? OR food-scent < 0.1 [ report False ]
+  if not food? AND food-scent < 0.1 [ report False ]
   ;; If we are not looking for a new food source and arrive at our prefered food source, exploit!
   if serendipity <= 0 AND f-memory = feedernumber [ report True ]
   ;; we should also exploit if we find a new food source while looking for one
@@ -698,16 +698,25 @@ to exploit
           stop
         ]
       ;; Modify the patch and set the load of the ant
-          set loaded? true	
-          set load-type food-type
+      set loaded? true	
+      set load-type food-type
       set food? food-type = 4 ;; Don't consume honeydew
       set exploit-counter -1
-      if not food? [ set food-type 0 ] ;; If the food was consumed, remove the food type
-      ][
-      ;; Is there the scent of food? -> move towards higher concentrations of it	
-      if food-scent > 0.1	[ uphill food-scent ]	
-        ]
+      if not food? [
+        ;; If the food was consumed, remove the food type, fedder number and nutritional value
+        set food-type 0
+        set feedernumber 0
+        set nutritionalQuality 0
       ]
+    ][
+     ;; Is there the scent of food? -> move towards higher concentrations of it	
+     ifelse food-scent > 0.1	[ uphill food-scent ]	
+      [
+        ;; there is no food around, get back to searching
+        set state "searching"
+      ]
+    ]
+  ]
 end
 
 	;; @**********@ agent method @**********@ ;;	
@@ -763,6 +772,7 @@ to exploiting-bug
     ask patches with [food? and food-type = 3] in-radius 10 [
       set food? false
       set food-type 0
+      set feedernumber 0
     ]
     ask patches in-radius 2 [
       set food? true
@@ -893,8 +903,15 @@ to go-last-food-source
     facexy waypoint-x waypoint-y ;; if i remember where i found food I turn in food direction.	
     if not can-move? 1
     [ rt random 180 ]
-  ]	[	
-    set-next-waypoint
+  ]	[
+    ;; If we are at the last waypoint and there is no food around, reset the waypoints
+    ifelse is-last-waypoint? and ( not any? patches in-radius 3 with [ food? ] ) [
+      reset-waypoints
+      set f-memory 0
+      set state "searching"
+    ] [
+      set-next-waypoint
+    ]
     set leader false
     ask ants in-radius 10 [ set state "searching" ]
   ]	
@@ -957,6 +974,21 @@ to change-last-waypoint [x y]
   let last-index ( length memory-waypoints ) - 1
   set memory-waypoints replace-item last-index memory-waypoints ( list x y )
 end
+
+;; @**********@ agent method @**********@ ;;	
+to reset-waypoints
+  ;; Clears the waypoints leaving only the nest position
+  set memory-waypoints ( list ( list nest-xcor nest-ycor ) )
+  set memory-next 0
+end
+
+
+;; @**********@ agent method @**********@ ;;	
+to-report is-last-waypoint?
+  ;; Checks if this is the last way point
+  report memory-next = (( length memory-waypoints ) - 1 )
+end
+
 
 ;; @**********@ agent method @**********@ ;;	
 to move-forward
@@ -1048,7 +1080,7 @@ ran-seed
 ran-seed
 0
 10000
-8.0
+17.0
 1
 1
 NIL
@@ -1104,7 +1136,7 @@ seeds
 seeds
 0
 200
-27.0
+0.0
 1
 1
 NIL
@@ -1119,7 +1151,7 @@ bugs
 bugs
 0
 100
-20.0
+100.0
 1
 1
 NIL
@@ -1134,7 +1166,7 @@ dead-bugs
 dead-bugs
 0
 100
-15.0
+0.0
 1
 1
 NIL
@@ -1149,7 +1181,7 @@ honeydew
 honeydew
 0
 20
-3.0
+0.0
 1
 1
 NIL
