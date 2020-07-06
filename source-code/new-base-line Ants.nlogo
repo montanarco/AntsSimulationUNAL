@@ -71,6 +71,8 @@ ants-own [              ;; ant atributes
   memory-old-next       ;; Position of the next waypoint from the old list of waypoints
   memory-x
   memory-y
+  memory-x-bug
+  memory-y-bug
   exploit-counter       ;; Number of ticks to remain exploiting a source before grabbing food and returning to the nest
   prelationHD           ;; Honey Dew prelation means the 20% of ant will only search for honey dew at the begining
 ]
@@ -79,7 +81,8 @@ patches-own [
   chemical-return      ;; amount of chemical on this patch
   pheromone-recruit    ;; a type of pheromone that is droped when help to carry big food source is requiered
   food?                ;; is there food on this patch?
-  food-type            ;; type of food in this patch if any - 0: none - 1: seed - 2: bug - 3: dead bugs - 4 : honeydew
+  food-type            ;; type of food in this patch if any - 0: none - 1: seed - 2: bug - 3: dead bugs - 4 : honeydew}
+  being-collected      ;; helps ants in chemical recruitment to know to wait in order to exploit a deadbug
   nutritionalQuality   ;; this value represents the food quality for the simulation we want to make ants search in other place than close to the nest so this value is to be directly relate to the nest distance
   nest?                ;; true on nest patches, false elsewhere
   nest-scent           ;; number that is higher closer to the nest
@@ -209,7 +212,7 @@ to setup-ants
     set energy 50
     set f-type-memory 0
     set exploit-counter -1
-    if who >= prelationNumber [set prelationHD true]
+    if who >= prelationNumber [set prelationHD true]  ;; activate to play the prelation in 20% ants to search only for HD
     reset-waypoints
   ]
 end
@@ -300,6 +303,7 @@ to spread-food [ftype last-feed-num x-coord y-coord food-size]
     set food? food? OR (distancexy x-coord y-coord) < food-size ;; This condition is required to make sources round, can be replaced with true
     set nutritionalQuality nutriQuality
     if maxNutritionalValue < nutritionalQuality [set maxNutritionalValue nutritionalQuality]
+    if ftype = 3 [set being-collected false]
     ]
 end
 
@@ -373,6 +377,7 @@ to go
     if (state = "exploiting" ) [exploit]
     if (state = "exploit-bug" ) [exploiting-bug]
     if (state = "recruiting" ) [recruit]
+    if (state = "recruited") [stand]
     set energy energy - 0.2
     if energy < 0 [ set energy 0]  ;; this keeps the energy minimum value to be 0
   ]
@@ -439,6 +444,8 @@ to global-measures
     let antsRecruiting count ants with [state = "recruiting"]
     let foodAvailable count patches with [food?]
     writeCSVrow filename  (list elapsed-days energy-collected-day protein-colleted-day food-collected-day energy-avg protein-avg trail-patches antsFTSeed antsFTBug antsFTDeadbug antsFTHoneydew antsSearching antsFollowing antsExploiting antsExploit-bug antsRecruiting foodAvailable)
+    ask patches with [food-type = 3] [set being-collected false]
+
   ]
 end
 
@@ -518,12 +525,21 @@ to search
   [
     ;; when the ant remembers a location where it has found any food, it goes back to check if there is more unless it is trying to search for more sources
     ifelse serendipity = 0 AND f-memory != 0 [
-      go-last-food-source
+      ;;go-last-food-source
+      alternative-last-food-source
       ;; Stray the ant from the direct route to the food with a probability setting its serendipity to ignore trails
       try-stray-from-path
     ]
     [
-      ;; Otherwise follow a pheromone or just search at random
+      look-for-food
+    ]
+  ]
+  move-forward
+  set steps steps + 1
+end
+
+to look-for-food
+   ;; Otherwise follow a pheromone or just search at random
       ifelse (pheromone-recruit >= 0.05) and (pheromone-recruit < 2) [   ;; original mecanism of pheromone following
         join-chemical "pheromone"
       ][
@@ -536,10 +552,6 @@ to search
           decrease-serendipity
         ]
       ]
-    ]
-  ]
-  move-forward
-  set steps steps + 1
 end
 
 ;; @**********@ agent method @**********@ ;;
@@ -560,11 +572,15 @@ end
 ;; @**********@ agent method @**********@ ;;
 to record-food-location
   set f-type-memory food-type
-  if food-type != 3[
+  ifelse food-type != 3[
     set f-memory feedernumber
     set nutriQuality-memory nutritionalQuality
     set memory-x xcor
     set memory-y ycor
+  ]
+  [
+    set memory-x-bug xcor
+    set memory-y-bug ycor
   ]
 end
 
@@ -667,55 +683,25 @@ end
 to exploit	
   set color green	
   ifelse loaded? [	
-    ;; we have food, lets get it to the nest but look for followers along the way
-    ask-for-followers
+    ask-for-followers     ;; we have food, lets get it to the nest but look for followers along the way
     ;; If we got to the nest -> unload food and restart searching	
     ifelse nest? [	
       set loaded? false	
       update-instant-measures
       ;; when the ant remembers a location where it has found any food, call others to show where the food source is	
-      if mechanical-recruit
-      [
-        set leader true	
-         ask ants in-radius 5 [ set state "following" ]
-        ;;let neighboors count ants in-radius 5
-        ;;ifelse neighboors > 5
-        ;;[ ask n-of 5 ants in-radius 5 [ set state "following" ]	];; number of turtles recruited limmeted to 5
-        ;;[ ask ants in-radius 5 [ set state "following" ] ]
-      ]
+      if mechanical-recruit [ do-mec-recruitement  ]
       set state "searching"	
-      stop	
-    ] [	
-      ;; Otherwise try to get to the nest	
-      return-to-nest	
-    ]	
+      stop
+    ]
+    [	return-to-nest]	 ;; Otherwise try to get to the nest
   ] [	
     ;; We are not loaded, so we should try to grab food	
     ;; Is there food? ->  Grab it	
     ifelse food? [
-      if exploting-source [ stop ]
-      do-memstrength
-      set energy energy + ((nutriQuality-memory / maxNutritionalValue) * 100)
-      if energy > 100  [set energy 100]
+      update-memory-and-energy
       record-food-location
-      ;;if prelationHD [prelationHD false]
-      if food-type = 3 and chemical-recruit [
-        ;; The ant needs help to carry the food, lets try to recruit
-          set bug-size measure-bug          ;; see how many comrades would be needed to carry th bug
-          set state "recruiting"
-          stop
-        ]
-      ;; Modify the patch and set the load of the ant
-      set loaded? true	
-      set load-type food-type
-      set food? food-type = 4 ;; Don't consume honeydew
-      set exploit-counter -1
-      if not food? [
-        ;; If the food was consumed, remove the food type, fedder number and nutritional value
-        set food-type 0
-        set feedernumber 0
-        set nutritionalQuality 0
-      ]
+      if food-type = 3 and chemical-recruit [ dead-bugs-collection ]
+      config-load-and-food
     ][
      ;; Is there the scent of food? -> move towards higher concentrations of it	
      ifelse food-scent > 0.1	[ uphill food-scent ]	
@@ -727,10 +713,45 @@ to exploit
   ]
 end
 
+to config-load-and-food
+   ;; Modify the patch and set the load of the ant
+      set loaded? true	
+      set load-type food-type
+      set food? food-type = 4 ;; Don't consume honeydew
+      set exploit-counter -1
+      if not food? [
+        ;; If the food was consumed, remove the food type, fedder number and nutritional value
+        set food-type 0
+        set feedernumber 0
+        set nutritionalQuality 0
+      ]
+end
+
+to dead-bugs-collection
+  ;; The ant needs help to carry the food, lets try to recruit
+        ifelse being-collected = false [
+          ask patches in-radius 7 [set being-collected true]
+          set bug-size measure-bug          ;; see how many comrades would be needed to carry th bug
+          set state "recruiting"
+          stop
+        ]
+        [
+          set state "recruited"
+          stop
+        ]
+end
+
+to update-memory-and-energy
+  if exploting-source [ stop ]
+  do-memstrength
+  set energy energy + ((nutriQuality-memory / maxNutritionalValue) * 100)
+  if energy > 100  [set energy 100]
+end
+
 to ask-for-followers
   ;; when the ant remembers a location where it has found any food, call others to show where the food source is	
   if mechanical-recruit [
-    set leader? true
+    set leader true
     let followers count other ants in-radius 3 with [ state = "following" and my-leader = who ]
     ifelse followers > 0 [
       ;; The ant has followers, guide them to the food source instead of continue the path to the nest
@@ -788,18 +809,24 @@ end
 
 ;; @**********@ agent method @**********@ ;;
 to recruit
-  let comrades count ants with [state = "recruiting"] in-radius 12
+  let comrades count ants with [state = "recruited"] in-radius 12
   ifelse (comrades >  (bug-size / 2))
   [
-    ask ants with [state = "recruiting"] in-radius 10 [
+
+    ifelse (distancexy memory-x-bug memory-y-bug) > 1
+    [find-bug-source
+    ]
+    [
+      ask patches in-radius 7 [set being-collected false]
+      ask ants with [state = "recruited"] in-radius 10 [
       set state "exploit-bug"
       set loaded? true	
       set load-type food-type
     ]
-    ifelse (distancexy memory-x memory-y) > 1
-    [find-bug-source
-    set bug-leader true]
-    [set bug-leader true]
+      set bug-leader true
+      set state "exploit-bug"
+    ]
+
   ][
     recruit-circles
     move-forward
@@ -819,9 +846,9 @@ to exploiting-bug
       set food? true
       set food-type 3
     ]
-    ifelse nest? [
+    ifelse (distancexy nest-xcor nest-ycor) < 1 [
       set bug-leader false
-      ask patches with [food? and food-type = 3] in-radius 10 [
+      ask patches with [food? and food-type = 3] in-radius 15 [
       set food? false
       set food-type 0
       set food-scent 0
@@ -829,32 +856,60 @@ to exploiting-bug
       set loaded? false	
       set state "searching"
     ]
-    [ return-to-nest ]
+    [ return-to-nest-bug ]
   ]
-  [ return-to-nest
+  [ return-to-nest-bug
     if nest? [set state "searching"]
   ]
 end
 
 	;; @**********@ agent method @**********@ ;;	
 to find-bug-source	
-    facexy memory-x memory-y ;; if i remember where i found food I turn in food direction.	
+    facexy memory-x-bug memory-y-bug ;; if i remember where i found food I turn in food direction.	
     if not can-move? 1
     [ rt random 180 ]
+    move-forward
 end
 
 ;; @**********@ agent method @**********@ ;;
 to join-chemical [kind]
+  let right-angle 0
+  let left-angle 0
+
   let scent-ahead chemical-scent-at-angle   0  kind
-  let scent-right chemical-scent-at-angle  45  kind
-  let scent-left  chemical-scent-at-angle -45  kind
-  ;let scent-right90 chemical-scent-at-angle  90  kind
-  ;let scent-left-90  chemical-scent-at-angle -90  kind
-  if (scent-right > scent-ahead) or (scent-left > scent-ahead)
+  let scent-right45 chemical-scent-at-angle  45  kind
+  let scent-left45  chemical-scent-at-angle -45  kind
+  let scent-right90 chemical-scent-at-angle  90  kind
+  let scent-left-90  chemical-scent-at-angle -90  kind
+
+  ifelse (scent-right45 > scent-right90 )
+  [set right-angle 45]
+  [set right-angle 90]
+
+  ifelse (scent-left45 > scent-left-90 )
+  [set left-angle 45]
+  [set left-angle 90]
+
+  let scent-left chemical-scent-at-angle left-angle kind
+  let scent-right chemical-scent-at-angle right-angle kind
+
+  if ( scent-right > scent-ahead) or ( scent-left > scent-ahead)
   [ ifelse scent-right > scent-left
-    [ rt 45 ]
-    [ lt 45 ] ]
+    [ rt right-angle ]
+    [ lt left-angle ]
+  ]
 end
+
+;; @**********@ agent method @**********@ ;;
+;;to join-chemical [kind]
+  ;;let scent-ahead chemical-scent-at-angle   0  kind
+  ;;let scent-right chemical-scent-at-angle  45  kind
+  ;;let scent-left  chemical-scent-at-angle -45  kind
+  ;;if (scent-right > scent-ahead) or (scent-left > scent-ahead)
+  ;;[ ifelse scent-right > scent-left
+    ;;[ rt 45 ]
+    ;;[ lt 45 ] ]
+;;end
 
 ;; @**********@ patch procedure @**********@ ;;
 to-report chemical-scent-at-angle [angle kind]
@@ -907,12 +962,30 @@ to recruit-circles
     set pheromone-recruit pheromone-recruit + 50
   ]
   [
+    if(loss-count < 103)[	
+    ask patches in-radius 7 [set being-collected false]
+    ]
     if(loss-count > 120)	
     [set state "searching"	
       set loss-count 0	
-    ] ;; if i was following some one but i dont see him for a period i rather go searching again	
+    ]
   ]
   set loss-count loss-count + 1	
+end
+
+to stand
+  ifelse(loss-count < 100)
+  [
+  rt 15
+  ]
+  [
+    if(loss-count > 120)	
+    [set state "searching"	
+      set loss-count 0	
+    ]
+   move-forward
+  ]
+  set loss-count loss-count + 1
 end
 
 ;; @**********@ agent method @**********@ ;;
@@ -920,12 +993,8 @@ to return-to-nest
   ifelse return-nest-direct [
     if load-type != 1 or load-type != 3 [ ;; if we are harvesting seeds or bug there is no need to leave a pheromene trail
       if deposit-pheromone
-      ;;[set chemical-return chemical-return + ( 0.03 * load-type)]
-      [ set chemical-return chemical-return + (0.002 * nutriQuality-memory)] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
       [ set chemical-return chemical-return + (0.0005 * (nutriQuality-memory * 2))] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
       set leader false
-      [ set chemical-return chemical-return + (0.002 * nutriQuality-memory)] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
-      set leader? false
     ]
     ;; this is to say that the ant has memory of nest location so it heads toward the next to return
     ;; this method should be canged for a path integration method
@@ -938,6 +1007,13 @@ to return-to-nest
     [ rt 180 ]
   ]
   [wiggle]
+  move-forward
+end
+
+to return-to-nest-bug
+  facexy nest-xcor nest-ycor
+  if not can-move? 1
+  [ rt 180 ]
   move-forward
 end
 
@@ -965,9 +1041,30 @@ to go-last-food-source
     ] [
       set-next-waypoint
     ]
-    set leader? false
+    set leader false
     ask ants in-radius 10 [ set state "searching" ]
   ]	
+end
+
+to alternative-last-food-source
+   ifelse (distancexy memory-x memory-y) > 1	[
+      facexy memory-x memory-y ;; if i remember where i found food I turn in food direction.	
+      if not can-move? 1
+      [ rt random 180 ]
+    ]	[	
+      set-next-waypoint
+      set leader false
+      ask ants in-radius 10 [ set state "searching" ]
+    ]
+  ifelse is-last-waypoint? and ( not any? patches in-radius 3 with [ food? ] ) [
+      reset-waypoints
+      set f-memory 0
+      set state "searching"
+    ] [
+      set-next-waypoint
+    ]
+    set leader false
+    ask ants in-radius 10 [ set state "searching" ]
 end
 
 
@@ -1084,7 +1181,7 @@ population
 population
 1
 100
-1.0
+20.0
 1
 1
 NIL
@@ -1133,7 +1230,7 @@ ran-seed
 ran-seed
 0
 10000
-8.0
+6.0
 1
 1
 NIL
@@ -1161,7 +1258,7 @@ SWITCH
 602
 trace?
 trace?
-0
+1
 1
 -1000
 
@@ -1189,7 +1286,7 @@ seeds
 seeds
 0
 200
-27.0
+0.0
 1
 1
 NIL
@@ -1204,7 +1301,7 @@ bugs
 bugs
 0
 100
-20.0
+0.0
 1
 1
 NIL
@@ -1219,7 +1316,7 @@ dead-bugs
 dead-bugs
 0
 100
-15.0
+0.0
 1
 1
 NIL
@@ -1234,7 +1331,7 @@ honeydew
 honeydew
 0
 20
-3.0
+18.0
 1
 1
 NIL
@@ -1260,7 +1357,7 @@ PENS
 "searching" 1.0 0 -2674135 true "" "plotxy ticks count ants with [state = \"searching\"]"
 "following" 1.0 0 -1184463 true "" "plotxy ticks count ants with [state = \"following\"]"
 "exploiting" 1.0 0 -13840069 true "" "plotxy ticks count ants with [state = \"exploiting\"]"
-"recruiting" 1.0 0 -5207188 true "" "plotxy ticks count ants with [state = \"recruiting\" or state = \"exploit-bug\"]"
+"recruiting" 1.0 0 -5207188 true "" "plotxy ticks count ants with [state = \"recruiting\" or state = \"recruited\" or state = \"exploit-bug\"]"
 
 TEXTBOX
 1434
@@ -1432,7 +1529,7 @@ SWITCH
 703
 deposit-pheromone
 deposit-pheromone
-1
+0
 1
 -1000
 
@@ -1443,7 +1540,7 @@ SWITCH
 704
 memory-on
 memory-on
-1
+0
 1
 -1000
 
@@ -1465,7 +1562,7 @@ SWITCH
 747
 chemical-recruit
 chemical-recruit
-0
+1
 1
 -1000
 
