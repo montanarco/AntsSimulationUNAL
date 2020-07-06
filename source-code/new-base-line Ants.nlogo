@@ -61,6 +61,7 @@ ants-own [              ;; ant atributes
   memstrength
   newfeedermemstrength
   leader                ;; use to indicate other ants to follow self to be guided to the food source
+  my-leader              ;; id of the ant that this ant follows
   bug-size
   bug-leader
   serendipity           ;; Number of ticks for which the ant will ignore pheromone trails to look for new food sources
@@ -199,6 +200,7 @@ to setup-ants
     set memstrength 1
     set f-memory 0
     set leader false
+    set my-leader -1
     set bug-leader false
     set load-type 0
     if trace? [ pen-down ]
@@ -208,6 +210,7 @@ to setup-ants
     set f-type-memory 0
     set exploit-counter -1
     if who >= prelationNumber [set prelationHD true]
+    reset-waypoints
   ]
 end
 
@@ -386,7 +389,7 @@ to go
     set food-scent 20
   ]
   ;; And diffuse it
-  diffuse food-scent 0.3
+  diffuse food-scent 0.5
   tick
 
   if debug [
@@ -499,6 +502,7 @@ end
 ;; @**********@ agent method @**********@ ;;
 to search
   set color red
+  set my-leader -1 ;; If searching, forget about a previous leader if any
   ;; Food has been found and we are not trying to explore different sources, proceed to exploiting state
   if should-exploit? [
     set serendipity 0
@@ -663,7 +667,8 @@ end
 to exploit	
   set color green	
   ifelse loaded? [	
-    ;; we have food, lets get it to the nest	
+    ;; we have food, lets get it to the nest but look for followers along the way
+    ask-for-followers
     ;; If we got to the nest -> unload food and restart searching	
     ifelse nest? [	
       set loaded? false	
@@ -701,16 +706,50 @@ to exploit
           stop
         ]
       ;; Modify the patch and set the load of the ant
-          set loaded? true	
-          set load-type food-type
+      set loaded? true	
+      set load-type food-type
       set food? food-type = 4 ;; Don't consume honeydew
       set exploit-counter -1
-      if not food? [ set food-type 0 ] ;; If the food was consumed, remove the food type
-      ][
-      ;; Is there the scent of food? -> move towards higher concentrations of it	
-      if food-scent > 0.1	[ uphill food-scent ]	
-        ]
+      if not food? [
+        ;; If the food was consumed, remove the food type, fedder number and nutritional value
+        set food-type 0
+        set feedernumber 0
+        set nutritionalQuality 0
       ]
+    ][
+     ;; Is there the scent of food? -> move towards higher concentrations of it	
+     ifelse food-scent > 0.1	[ uphill food-scent ]	
+      [
+        ;; there is no food around, get back to searching
+        set state "searching"
+      ]
+    ]
+  ]
+end
+
+to ask-for-followers
+  ;; when the ant remembers a location where it has found any food, call others to show where the food source is	
+  if mechanical-recruit [
+    set leader? true
+    let followers count other ants in-radius 3 with [ state = "following" and my-leader = who ]
+    ifelse followers > 0 [
+      ;; The ant has followers, guide them to the food source instead of continue the path to the nest
+      set state "searching"
+      set-next-waypoint
+    ] [
+      let ways memory-waypoints
+      ;; No followers, ask ants around to follow
+      let available-ants other ants in-radius 3 with [ not loaded? and my-leader = -1 ]
+      if count available-ants > 1 [
+        set available-ants n-of 2 available-ants
+      ]
+      ask available-ants [
+        set state "following"
+        set memory-waypoints ways
+        set memory-next ( length ways ) - 1
+      ]
+    ]
+  ]
 end
 
 to do-mec-recruitement
@@ -774,6 +813,7 @@ to exploiting-bug
     ask patches with [food? and food-type = 3] in-radius 10 [
       set food? false
       set food-type 0
+      set feedernumber 0
     ]
     ask patches in-radius 2 [
       set food? true
@@ -881,8 +921,11 @@ to return-to-nest
     if load-type != 1 or load-type != 3 [ ;; if we are harvesting seeds or bug there is no need to leave a pheromene trail
       if deposit-pheromone
       ;;[set chemical-return chemical-return + ( 0.03 * load-type)]
+      [ set chemical-return chemical-return + (0.002 * nutriQuality-memory)] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
       [ set chemical-return chemical-return + (0.0005 * (nutriQuality-memory * 2))] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
       set leader false
+      [ set chemical-return chemical-return + (0.002 * nutriQuality-memory)] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
+      set leader? false
     ]
     ;; this is to say that the ant has memory of nest location so it heads toward the next to return
     ;; this method should be canged for a path integration method
@@ -909,6 +952,22 @@ to go-last-food-source
       set leader false
       ask ants in-radius 10 [ set state "searching" ]
     ]
+  ifelse (distancexy waypoint-x waypoint-y) > 1	[
+    facexy waypoint-x waypoint-y ;; if i remember where i found food I turn in food direction.	
+    if not can-move? 1
+    [ rt random 180 ]
+  ]	[
+    ;; If we are at the last waypoint and there is no food around, reset the waypoints
+    ifelse is-last-waypoint? and ( not any? patches in-radius 3 with [ food? ] ) [
+      reset-waypoints
+      set f-memory 0
+      set state "searching"
+    ] [
+      set-next-waypoint
+    ]
+    set leader? false
+    ask ants in-radius 10 [ set state "searching" ]
+  ]	
 end
 
 
@@ -970,6 +1029,21 @@ to change-last-waypoint [x y]
 end
 
 ;; @**********@ agent method @**********@ ;;	
+to reset-waypoints
+  ;; Clears the waypoints leaving only the nest position
+  set memory-waypoints ( list ( list nest-xcor nest-ycor ) )
+  set memory-next 0
+end
+
+
+;; @**********@ agent method @**********@ ;;	
+to-report is-last-waypoint?
+  ;; Checks if this is the last way point
+  report memory-next = (( length memory-waypoints ) - 1 )
+end
+
+
+;; @**********@ agent method @**********@ ;;	
 to move-forward
   fd 1
 end
@@ -1009,8 +1083,8 @@ SLIDER
 population
 population
 1
-200
-200.0
+100
+1.0
 1
 1
 NIL
@@ -1059,7 +1133,7 @@ ran-seed
 ran-seed
 0
 10000
-203.0
+8.0
 1
 1
 NIL
@@ -1087,7 +1161,7 @@ SWITCH
 602
 trace?
 trace?
-1
+0
 1
 -1000
 
@@ -1100,7 +1174,7 @@ max_fullness
 max_fullness
 0
 200
-200.0
+0.0
 5
 1
 NIL
@@ -1115,7 +1189,7 @@ seeds
 seeds
 0
 200
-15.0
+27.0
 1
 1
 NIL
@@ -1130,7 +1204,7 @@ bugs
 bugs
 0
 100
-6.0
+20.0
 1
 1
 NIL
@@ -1145,7 +1219,7 @@ dead-bugs
 dead-bugs
 0
 100
-7.0
+15.0
 1
 1
 NIL
@@ -1160,7 +1234,7 @@ honeydew
 honeydew
 0
 20
-5.0
+3.0
 1
 1
 NIL
@@ -1358,7 +1432,7 @@ SWITCH
 703
 deposit-pheromone
 deposit-pheromone
-0
+1
 1
 -1000
 
@@ -1369,7 +1443,7 @@ SWITCH
 704
 memory-on
 memory-on
-0
+1
 1
 -1000
 
@@ -1380,7 +1454,7 @@ SWITCH
 747
 mechanical-recruit
 mechanical-recruit
-0
+1
 1
 -1000
 
