@@ -1136,10 +1136,10 @@ to move-forward
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-383
-15
-1395
-828
+245
+24
+1257
+837
 -1
 -1
 4.0
@@ -1165,7 +1165,7 @@ ticks
 SLIDER
 24
 40
-196
+215
 73
 population
 population
@@ -1178,10 +1178,10 @@ NIL
 HORIZONTAL
 
 BUTTON
-26
-99
-89
-132
+1282
+53
+1360
+86
 NIL
 setup
 NIL
@@ -1195,10 +1195,10 @@ NIL
 1
 
 BUTTON
-113
-100
-192
-133
+1369
+53
+1448
+86
 go
 set debug False\ngo
 T
@@ -1213,9 +1213,9 @@ NIL
 
 SLIDER
 24
-147
-196
-180
+79
+216
+112
 ran-seed
 ran-seed
 0
@@ -1228,9 +1228,9 @@ HORIZONTAL
 
 SLIDER
 25
-243
-205
-276
+147
+217
+180
 per_step_max_rotation
 per_step_max_rotation
 0
@@ -1242,10 +1242,10 @@ NIL
 HORIZONTAL
 
 SWITCH
-28
-569
-131
-602
+1283
+101
+1386
+134
 trace?
 trace?
 1
@@ -1253,10 +1253,10 @@ trace?
 -1000
 
 SLIDER
-26
-483
-198
-516
+25
+188
+218
+221
 max_fullness
 max_fullness
 0
@@ -1268,10 +1268,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-1426
-54
-1598
-87
+244
+875
+416
+908
 seeds
 seeds
 0
@@ -1283,10 +1283,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-1428
-103
-1600
-136
+245
+915
+417
+948
 bugs
 bugs
 0
@@ -1298,10 +1298,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-1429
-153
-1601
-186
+246
+954
+418
+987
 dead-bugs
 dead-bugs
 0
@@ -1313,10 +1313,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-1430
-201
-1602
-234
+247
+993
+419
+1026
 honeydew
 honeydew
 0
@@ -1328,10 +1328,10 @@ NIL
 HORIZONTAL
 
 PLOT
-28
-610
-306
-830
+1286
+614
+1564
+834
 Ants by State
 NIL
 NIL
@@ -1350,30 +1350,30 @@ PENS
 "recruiting" 1.0 0 -5207188 true "" "plotxy ticks count ants with [state = \"recruiting\" or state = \"recruited\" or state = \"exploit-bug\"]"
 
 TEXTBOX
-1434
-27
-1584
-45
+246
+854
+396
+872
 Food sources
 11
 0.0
 1
 
 TEXTBOX
-1429
-260
-1579
-278
+27
+479
+177
+497
 Pheromones
 11
 0.0
 1
 
 INPUTBOX
-1426
-290
-1701
-350
+24
+498
+220
+558
 pheromone-diffusion-rates
 [ 2 0 100 ]
 1
@@ -1381,10 +1381,10 @@ pheromone-diffusion-rates
 String
 
 INPUTBOX
-1426
-362
-1697
-422
+25
+563
+220
+623
 pheromone-evaporation-rates
 [ 5 0.01 20 ]
 1
@@ -1392,20 +1392,20 @@ pheromone-evaporation-rates
 String
 
 CHOOSER
-1427
-437
-1565
-482
+122
+631
+224
+676
 pheromone-return
 pheromone-return
 1 2 3
 1
 
 SLIDER
-1629
-55
-1841
-88
+437
+876
+635
+909
 seeds-spawn-probability
 seeds-spawn-probability
 0
@@ -1417,10 +1417,10 @@ seeds-spawn-probability
 HORIZONTAL
 
 SLIDER
-1631
-101
-1837
-134
+438
+913
+635
+946
 bugs-spawn-probability
 bugs-spawn-probability
 0
@@ -1432,10 +1432,10 @@ bugs-spawn-probability
 HORIZONTAL
 
 SLIDER
-1632
-152
-1859
-185
+439
+953
+636
+986
 dead-bugs-spawn-probability
 dead-bugs-spawn-probability
 0
@@ -1448,9 +1448,9 @@ HORIZONTAL
 
 SLIDER
 25
-197
-197
-230
+393
+219
+426
 stray-probability
 stray-probability
 0
@@ -1462,20 +1462,20 @@ stray-probability
 HORIZONTAL
 
 TEXTBOX
-1429
-491
-1579
-509
-Memoria\n
+29
+276
+179
+294
+Memory\n
 11
 0.0
 1
 
 SLIDER
-1426
-514
-1598
-547
+27
+310
+220
+343
 max-memory
 max-memory
 0
@@ -1487,10 +1487,10 @@ NIL
 HORIZONTAL
 
 SWITCH
-139
-570
-243
-603
+1395
+102
+1499
+135
 fixed-food?
 fixed-food?
 1
@@ -1498,10 +1498,10 @@ fixed-food?
 -1000
 
 SLIDER
-26
-525
-198
-558
+25
+435
+220
+468
 random-serendipity
 random-serendipity
 0
@@ -1513,10 +1513,10 @@ NIL
 HORIZONTAL
 
 SWITCH
-1426
-670
-1579
-703
+26
+631
+116
+664
 deposit-pheromone
 deposit-pheromone
 0
@@ -1524,10 +1524,10 @@ deposit-pheromone
 -1000
 
 SWITCH
-1594
-671
-1721
-704
+96
+266
+219
+299
 memory-on
 memory-on
 0
@@ -1535,10 +1535,10 @@ memory-on
 -1000
 
 SWITCH
-1424
-714
-1580
-747
+26
+752
+179
+785
 mechanical-recruit
 mechanical-recruit
 0
@@ -1546,10 +1546,10 @@ mechanical-recruit
 -1000
 
 SWITCH
-1594
-714
-1723
-747
+26
+682
+116
+715
 chemical-recruit
 chemical-recruit
 0
@@ -1557,10 +1557,10 @@ chemical-recruit
 -1000
 
 SWITCH
-1595
-757
-1725
-790
+96
+351
+219
+384
 serendipity-on
 serendipity-on
 1
@@ -1568,10 +1568,10 @@ serendipity-on
 -1000
 
 SWITCH
-1424
-757
-1582
-790
+26
+833
+182
+866
 return-nest-direct
 return-nest-direct
 0
@@ -1579,20 +1579,20 @@ return-nest-direct
 -1000
 
 TEXTBOX
-1428
-647
-1578
-665
-Mechanism Activation
+24
+729
+174
+747
+Other
 11
 0.0
 1
 
 MONITOR
-1626
-509
-1735
-554
+1287
+372
+1396
+417
 memory-switches
 memory-switches
 17
@@ -1600,10 +1600,10 @@ memory-switches
 11
 
 PLOT
-24
-312
-203
-436
+1287
+479
+1466
+603
 colony enegy
 NIL
 NIL
@@ -1622,10 +1622,10 @@ PENS
 "collectedprotein" 1.0 0 -15637942 true "" "plotxy ticks / 30 protein-colleted * 20"
 
 SLIDER
-1427
-587
-1599
-620
+1286
+331
+1458
+364
 ticks-per-day
 ticks-per-day
 0
@@ -1633,24 +1633,24 @@ ticks-per-day
 150.0
 1
 1
-NIL
+ticks
 HORIZONTAL
 
 TEXTBOX
-1432
-562
-1582
-580
-day length in ticks
+1288
+315
+1438
+333
+Ticks per checkpoint
 11
 0.0
 1
 
 MONITOR
-1727
-579
-1837
-624
+1405
+425
+1515
+470
 amount-collected
 food-collected-day
 17
@@ -1658,10 +1658,10 @@ food-collected-day
 11
 
 MONITOR
-1621
-580
-1708
-625
+1288
+424
+1397
+469
 elapsed-days
 elapsed-days
 17
@@ -1669,36 +1669,21 @@ elapsed-days
 11
 
 MONITOR
-1745
-511
-1823
-556
+1404
+372
+1514
+417
 energy-avg
 energy-avg
 3
 1
 11
 
-SLIDER
-25
-441
-263
-474
-ant-speed
-ant-speed
-0.01
-0.1
-0.07
-0.01
-1
-m/s
-HORIZONTAL
-
 PLOT
-207
-311
-373
-436
+1470
+478
+1636
+603
 ants by food type
 NIL
 NIL
@@ -1716,15 +1701,85 @@ PENS
 "pen-4" 1.0 2 -1184463 true "" "plotxy ticks count ants with [f-type-memory = 4]"
 
 SWITCH
-210
-526
-314
-559
+26
+792
+180
+825
 prelation
 prelation
-1
+0
 1
 -1000
+
+TEXTBOX
+27
+362
+90
+380
+Serendipity
+11
+0.0
+1
+
+CHOOSER
+123
+683
+224
+728
+pheromone-group
+pheromone-group
+1 2 3
+0
+
+TEXTBOX
+13
+16
+163
+34
+Simulation
+14
+23.0
+1
+
+TEXTBOX
+13
+123
+163
+141
+Ant values
+11
+0.0
+1
+
+TEXTBOX
+14
+242
+164
+260
+Mechanisms
+14
+23.0
+1
+
+TEXTBOX
+1272
+26
+1422
+45
+Execution
+15
+22.0
+1
+
+TEXTBOX
+1276
+281
+1426
+300
+Output
+15
+22.0
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
