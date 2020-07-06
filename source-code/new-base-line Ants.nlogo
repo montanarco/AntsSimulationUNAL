@@ -42,6 +42,7 @@ globals [
   antsFTDeadBug-count   ;; number of ants that are collecting dead bugs
   antsFTHoneyDew-count  ;; number of ants that are collecting hobey dews
   countFT-ants          ;; count to search the average number of ants by food type
+  prelationNumber       ;; calculating only 20% of the total population will behave with prelation
 ]
 
 breed [ants ant]        ;; ants breed is declared
@@ -70,6 +71,7 @@ ants-own [              ;; ant atributes
   memory-x
   memory-y
   exploit-counter       ;; Number of ticks to remain exploiting a source before grabbing food and returning to the nest
+  prelationHD           ;; Honey Dew prelation means the 20% of ant will only search for honey dew at the begining
 ]
 
 patches-own [
@@ -154,6 +156,7 @@ to setup-globals
   set protein-colleted-day 0
   set trail-patches 0
   set countFT-ants 0
+  set prelationNumber floor( population / 5)
 
   set antsFTSeed-count 0
   set antsFTBug-count 0
@@ -204,6 +207,7 @@ to setup-ants
     set energy 50
     set f-type-memory 0
     set exploit-counter -1
+    if who >= prelationNumber [set prelationHD true]
   ]
 end
 
@@ -283,8 +287,8 @@ end
 
 to spread-food [ftype last-feed-num x-coord y-coord food-size]
   let nutriQuality 0
-  ifelse ftype = 3
-    [set nutriQuality one-of[ 20 40 60 ]
+  ifelse ftype = 4
+    [set nutriQuality one-of[ 20 20 20 40 40 60 ]
     print word "nutriQuality: " nutriQuality]
     [set nutriQuality ((random 10) + 1) * ftype]
   ask patches in-radius food-size [
@@ -321,19 +325,11 @@ to recolor-patch
       if food-type = 1 [ set pcolor blue ] ;; seed
       if food-type = 2 [ set pcolor green ] ;; bug
       if food-type = 3 [ set pcolor brown ] ;; dead bugs
-      if food-type = 4 [ set pcolor yellow ];; honeydew
-      ;[
-       ;set pcolor (ifelse-value
-        ;nutritionalQuality = 20 [ yellow ]
-        ;nutritionalQuality = 40 [ orange ]
-        ;nutritionalQuality = 60 [ red ]
-        ;[ black ]
-      ;)
-        ;;if nutritionalQuality = 20 [ set pcolor yellow ]
-        ;;if nutritionalQuality = 40 [ set pcolor orange ]
-        ;;if nutritionalQuality = 60 [ set pcolor red ]
-      ;]
-    ] [
+      if (food-type = 4 and nutritionalQuality = 20) [ set pcolor yellow ];; honeydew
+      if (food-type = 4 and nutritionalQuality = 40) [ set pcolor orange ];; honeydew
+      if (food-type = 4 and nutritionalQuality = 60) [ set pcolor red ];; honeydew
+      ]
+      [
       ;; If there is food-scent, show it
       set pcolor scale-color pink food-scent 0.1 20
       ;; If there is a trace of pheromone show it
@@ -366,7 +362,7 @@ end
 
 to go
   ask ants  [
-    if who >= ticks [ stop ] ;; delay initial departure
+    if (who / 2) >= ticks [ stop ] ;; delay initial departure
                              ;; works like an case statement so depending on the state the ant excecutes a particular behaviour
     if (state = "waiting" ) [hold]
     if (state = "searching" ) [search]
@@ -551,6 +547,8 @@ to-report should-exploit?
   if serendipity <= 0 AND f-memory = feedernumber [ report True ]
   ;; we should also exploit if we find a new food source while looking for one
   if serendipity > 0 AND f-memory = feedernumber [ report False ]
+  ;; if this is one of the ants with Honwy dew prelation and it finds a food source other than HD it ignores it
+  if (prelationHD = true) AND (food-type != 4)  [report false]
   ;; If we get here this is the first food souce found by the ant, exploit!
   report True
 end
@@ -673,8 +671,12 @@ to exploit
       ;; when the ant remembers a location where it has found any food, call others to show where the food source is	
       if mechanical-recruit
       [
-         set leader true	
-         ask ants in-radius 5 [ set state "following" ]	
+        set leader true	
+         ask ants in-radius 5 [ set state "following" ]
+        ;;let neighboors count ants in-radius 5
+        ;;ifelse neighboors > 5
+        ;;[ ask n-of 5 ants in-radius 5 [ set state "following" ]	];; number of turtles recruited limmeted to 5
+        ;;[ ask ants in-radius 5 [ set state "following" ] ]
       ]
       set state "searching"	
       stop	
@@ -691,6 +693,7 @@ to exploit
       set energy energy + ((nutriQuality-memory / maxNutritionalValue) * 100)
       if energy > 100  [set energy 100]
       record-food-location
+      ;;if prelationHD [prelationHD false]
       if food-type = 3 and chemical-recruit [
         ;; The ant needs help to carry the food, lets try to recruit
           set bug-size measure-bug          ;; see how many comrades would be needed to carry th bug
@@ -710,6 +713,14 @@ to exploit
       ]
 end
 
+to do-mec-recruitement
+   set leader true	
+   let neighboors count ants in-radius 5
+   ifelse neighboors > 5
+   [ ask n-of 5 ants in-radius 5 [ set state "following" ]	];; number of turtles recruited limmeted to 5
+   [ ask ants in-radius 5 [ set state "following" ] ]
+end
+
 	;; @**********@ agent method @**********@ ;;	
 to-report exploting-source
   ;; Food sources other than honeydew are exploited instantly and we only exploit for a set number of ticks
@@ -724,7 +735,7 @@ end
 to update-instant-measures
   set food-collected food-collected + 1 ;; if the ant is loaded ans arrives to the nest then he has collected a food unit
 
-  ifelse f-type-memory = 3
+  ifelse f-type-memory = 4
   [set energy-collected energy-collected + nutriQuality-memory
    set energy-units energy-units + 1] ;; if the ant is loaded ans arrives to the nest then he has collected a food unit
   [set protein-colleted protein-colleted + nutriQuality-memory
@@ -870,7 +881,7 @@ to return-to-nest
     if load-type != 1 or load-type != 3 [ ;; if we are harvesting seeds or bug there is no need to leave a pheromene trail
       if deposit-pheromone
       ;;[set chemical-return chemical-return + ( 0.03 * load-type)]
-      [ set chemical-return chemical-return + (0.002 * nutriQuality-memory)] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
+      [ set chemical-return chemical-return + (0.0005 * (nutriQuality-memory * 2))] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
       set leader false
     ]
     ;; this is to say that the ant has memory of nest location so it heads toward the next to return
@@ -889,15 +900,15 @@ end
 
 ;; @**********@ agent method @**********@ ;;	
 to go-last-food-source	
-  ifelse (distancexy waypoint-x waypoint-y) > 1	[
-    facexy waypoint-x waypoint-y ;; if i remember where i found food I turn in food direction.	
-    if not can-move? 1
-    [ rt random 180 ]
-  ]	[	
-    set-next-waypoint
-    set leader false
-    ask ants in-radius 10 [ set state "searching" ]
-  ]	
+    ifelse (distancexy waypoint-x waypoint-y) > 1	[
+      facexy waypoint-x waypoint-y ;; if i remember where i found food I turn in food direction.	
+      if not can-move? 1
+      [ rt random 180 ]
+    ]	[	
+      set-next-waypoint
+      set leader false
+      ask ants in-radius 10 [ set state "searching" ]
+    ]
 end
 
 
@@ -998,8 +1009,8 @@ SLIDER
 population
 population
 1
-100
-1.0
+200
+200.0
 1
 1
 NIL
@@ -1048,7 +1059,7 @@ ran-seed
 ran-seed
 0
 10000
-8.0
+203.0
 1
 1
 NIL
@@ -1076,7 +1087,7 @@ SWITCH
 602
 trace?
 trace?
-0
+1
 1
 -1000
 
@@ -1089,7 +1100,7 @@ max_fullness
 max_fullness
 0
 200
-0.0
+200.0
 5
 1
 NIL
@@ -1104,7 +1115,7 @@ seeds
 seeds
 0
 200
-27.0
+15.0
 1
 1
 NIL
@@ -1119,7 +1130,7 @@ bugs
 bugs
 0
 100
-20.0
+6.0
 1
 1
 NIL
@@ -1134,7 +1145,7 @@ dead-bugs
 dead-bugs
 0
 100
-15.0
+7.0
 1
 1
 NIL
@@ -1149,7 +1160,7 @@ honeydew
 honeydew
 0
 20
-3.0
+5.0
 1
 1
 NIL
@@ -1347,7 +1358,7 @@ SWITCH
 703
 deposit-pheromone
 deposit-pheromone
-1
+0
 1
 -1000
 
@@ -1358,7 +1369,7 @@ SWITCH
 704
 memory-on
 memory-on
-1
+0
 1
 -1000
 
@@ -1369,7 +1380,7 @@ SWITCH
 747
 mechanical-recruit
 mechanical-recruit
-1
+0
 1
 -1000
 
