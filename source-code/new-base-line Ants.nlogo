@@ -212,7 +212,7 @@ to setup-ants
     set energy 50
     set f-type-memory 0
     set exploit-counter -1
-    if who >= prelationNumber [set prelationHD true]  ;; activate to play the prelation in 20% ants to search only for HD
+    if prelation [  if who >= prelationNumber [set prelationHD true]  ]
     reset-waypoints
   ]
 end
@@ -669,7 +669,7 @@ to follow-ant
     [ rt random 180 ]
     move-forward	
     set loss-count loss-count + 1	
-    if(loss-count > 100)	[
+    if(loss-count > 50)	[
       set state "searching"	
       set loss-count 0	
     ] ;; if i was following some one but i dont see him for a period i rather go searching again	
@@ -862,44 +862,44 @@ to find-bug-source
 end
 
 ;; @**********@ agent method @**********@ ;;
-to join-chemical [kind]
-  let right-angle 0
-  let left-angle 0
+;;to join-chemical [kind]
+  ;;let right-angle 0
+  ;;let left-angle 0
 
-  let scent-ahead chemical-scent-at-angle   0  kind
-  let scent-right45 chemical-scent-at-angle  45  kind
-  let scent-left45  chemical-scent-at-angle -45  kind
-  let scent-right90 chemical-scent-at-angle  90  kind
-  let scent-left-90  chemical-scent-at-angle -90  kind
+  ;;let scent-ahead chemical-scent-at-angle   0  kind
+  ;;let scent-right45 chemical-scent-at-angle  45  kind
+  ;;let scent-left45  chemical-scent-at-angle -45  kind
+  ;;let scent-right90 chemical-scent-at-angle  90  kind
+  ;;let scent-left-90  chemical-scent-at-angle -90  kind
 
-  ifelse (scent-right45 > scent-right90 )
-  [set right-angle 45]
-  [set right-angle 90]
+  ;;ifelse (scent-right45 > scent-right90 )
+  ;;[set right-angle 45]
+  ;;[set right-angle 90]
 
-  ifelse (scent-left45 > scent-left-90 )
-  [set left-angle 45]
-  [set left-angle 90]
+  ;;ifelse (scent-left45 > scent-left-90 )
+  ;;[set left-angle 45]
+  ;;[set left-angle 90]
 
-  let scent-left chemical-scent-at-angle left-angle kind
-  let scent-right chemical-scent-at-angle right-angle kind
+  ;;let scent-left chemical-scent-at-angle left-angle kind
+  ;;let scent-right chemical-scent-at-angle right-angle kind
 
-  if ( scent-right > scent-ahead) or ( scent-left > scent-ahead)
-  [ ifelse scent-right > scent-left
-    [ rt right-angle ]
-    [ lt left-angle ]
-  ]
-end
+  ;;if ( scent-right > scent-ahead) or ( scent-left > scent-ahead)
+  ;;[ ifelse scent-right > scent-left
+    ;;[ rt right-angle ]
+    ;;[ lt left-angle ]
+  ;;]
+;;end
 
 ;; @**********@ agent method @**********@ ;;
-;;to join-chemical [kind]
-  ;;let scent-ahead chemical-scent-at-angle   0  kind
-  ;;let scent-right chemical-scent-at-angle  45  kind
-  ;;let scent-left  chemical-scent-at-angle -45  kind
-  ;;if (scent-right > scent-ahead) or (scent-left > scent-ahead)
-  ;;[ ifelse scent-right > scent-left
-    ;;[ rt 45 ]
-    ;;[ lt 45 ] ]
-;;end
+to join-chemical [kind]
+  let scent-ahead chemical-scent-at-angle   0  kind
+  let scent-right chemical-scent-at-angle  45  kind
+  let scent-left  chemical-scent-at-angle -45  kind
+  if (scent-right > scent-ahead) or (scent-left > scent-ahead)
+  [ ifelse scent-right > scent-left
+    [ rt 45 ]
+    [ lt 45 ] ]
+end
 
 ;; @**********@ patch procedure @**********@ ;;
 to-report chemical-scent-at-angle [angle kind]
@@ -1171,7 +1171,7 @@ population
 population
 1
 100
-20.0
+100.0
 1
 1
 NIL
@@ -1220,7 +1220,7 @@ ran-seed
 ran-seed
 0
 10000
-6.0
+18.0
 1
 1
 NIL
@@ -1276,7 +1276,7 @@ seeds
 seeds
 0
 200
-0.0
+39.0
 1
 1
 NIL
@@ -1291,7 +1291,7 @@ bugs
 bugs
 0
 100
-0.0
+17.0
 1
 1
 NIL
@@ -1306,7 +1306,7 @@ dead-bugs
 dead-bugs
 0
 100
-0.0
+16.0
 1
 1
 NIL
@@ -1321,7 +1321,7 @@ honeydew
 honeydew
 0
 20
-18.0
+3.0
 1
 1
 NIL
@@ -1480,7 +1480,7 @@ max-memory
 max-memory
 0
 20
-3.0
+2.0
 1
 1
 NIL
@@ -1541,7 +1541,7 @@ SWITCH
 747
 mechanical-recruit
 mechanical-recruit
-1
+0
 1
 -1000
 
@@ -1552,7 +1552,7 @@ SWITCH
 747
 chemical-recruit
 chemical-recruit
-1
+0
 1
 -1000
 
@@ -1714,6 +1714,17 @@ PENS
 "pen-2" 1.0 2 -13840069 true "" "plotxy ticks count ants with [f-type-memory = 2]"
 "pen-3" 1.0 2 -6459832 true "" "plotxy ticks count ants with [f-type-memory = 3]"
 "pen-4" 1.0 2 -1184463 true "" "plotxy ticks count ants with [f-type-memory = 4]"
+
+SWITCH
+210
+526
+314
+559
+prelation
+prelation
+1
+1
+-1000
 
 @#$#@#$#@
 ## WHAT IS IT?
