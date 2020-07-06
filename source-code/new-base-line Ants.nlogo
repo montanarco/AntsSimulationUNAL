@@ -688,8 +688,6 @@ to exploit
     ifelse nest? [	
       set loaded? false	
       update-instant-measures
-      ;; when the ant remembers a location where it has found any food, call others to show where the food source is	
-      if mechanical-recruit [ do-mec-recruitement  ]
       set state "searching"	
       stop
     ]
@@ -771,14 +769,6 @@ to ask-for-followers
       ]
     ]
   ]
-end
-
-to do-mec-recruitement
-   set leader true	
-   let neighboors count ants in-radius 5
-   ifelse neighboors > 5
-   [ ask n-of 5 ants in-radius 5 [ set state "following" ]	];; number of turtles recruited limmeted to 5
-   [ ask ants in-radius 5 [ set state "following" ] ]
 end
 
 	;; @**********@ agent method @**********@ ;;	
