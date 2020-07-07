@@ -11,7 +11,6 @@ globals [
   ;; trails
   pheromones-diffusion
   pheromones-evaporation
-  pheromones-help-evaporation
   ;; memory
   last-feedernumber
   MemoryArray
@@ -78,8 +77,9 @@ ants-own [              ;; ant atributes
 ]
 
 patches-own [
-  chemical-return      ;; amount of chemical on this patch
+  chemical-return      ;; amount of pheromone for long standing food sources on this patch
   pheromone-recruit    ;; a type of pheromone that is droped when help to carry big food source is requiered
+  pheromone-temporal   ;; a type of pheromore for temporal food sources
   food?                ;; is there food on this patch?
   food-type            ;; type of food in this patch if any - 0: none - 1: seed - 2: bug - 3: dead bugs - 4 : honeydew}
   being-collected      ;; helps ants in chemical recruitment to know to wait in order to exploit a deadbug
@@ -88,6 +88,7 @@ patches-own [
   nest-scent           ;; number that is higher closer to the nest
   food-scent           ;; the smell a food source produces in the neigbors around
   feedernumber         ;; id of the food source
+  pheromones           ;; list of values of pheromones in a patch
 ]
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -97,6 +98,7 @@ patches-own [
 to setup
   clear-all
   setup-globals
+  setup-pheromones
   set-default-shape ants "bug"
   set last-feedernumber 0
   ;;calculate random locations for the nest and the ants
@@ -227,6 +229,9 @@ to setup-patches
   ifelse fixed-food?
   [ fixed-patches ]
   [ random-patches ]
+  ask patches [
+    recolor-patch
+  ]
 end
 
 to random-patches
@@ -236,7 +241,6 @@ to random-patches
   spawn-food-sources 4 honeydew 1
   ask patches [
     setup-nest nest-xcor nest-ycor ;; Place the nest at a random point
-    recolor-patch ;; Color all the patches depending if they are food source or nest
   ]
 end
 
@@ -249,7 +253,6 @@ to fixed-patches
    locate-fix-food 4 honeyDewLoc (length lstHoneyDew) 3
    ask patches [
     setup-nest nest-xcor nest-ycor ;; Place the nest at a random point
-    recolor-patch ;; Color all the patches depending if they are food source or nest
   ]
 end
 
@@ -264,7 +267,6 @@ end
 to setup-pheromones
   set pheromones-diffusion read-from-string pheromone-diffusion-rates
   set pheromones-evaporation read-from-string pheromone-evaporation-rates
-  set pheromones-help-evaporation 13
 end
 
 ;; Sets the number of food sources indicated by the food-sources slider
@@ -343,9 +345,11 @@ to recolor-patch
       if chemical-return > 0.1 [
         set pcolor scale-color green chemical-return 0 1
       ]
-
-    if pheromone-recruit > 0.1 [
-        set pcolor scale-color brown pheromone-recruit 0.01 5
+      if pheromone-recruit > 0.1 [
+        set pcolor scale-color brown pheromone-recruit 0 5
+      ]
+      if pheromone-temporal > 0.1 [
+        set pcolor scale-color blue pheromone-temporal 0 1
       ]
     ]
   ]
@@ -382,19 +386,11 @@ to go
     if energy < 0 [ set energy 0]  ;; this keeps the energy minimum value to be 0
   ]
 
-  setup-pheromones
-  diffuse-chemical
-  diffuse-pheromones
+  update-patches
   count-ants-by-food-type
   global-measures
   respawn-food
 
-  ;; Add the food-scent
-  ask patches with [food?] [
-    set food-scent 20
-  ]
-  ;; And diffuse it
-  diffuse food-scent 0.5
   tick
 
   if debug [
@@ -468,24 +464,28 @@ to respawn-food
 end
 
 ;; @**********@ patch procedure @**********@ ;;
-to diffuse-chemical
-  diffuse chemical-return ((diffusion pheromone-return)/ 100)
-  ask patches [
-    set chemical-return chemical-return * (100 - (evaporation pheromone-return)) / 100  ;; slowly evaporate chemical
-    ;;set chemical-return chemical-return - evaporation pheromone-return ;;
-    ;; We need to lower the general level of food-scent since we are adding more constantly
-    set food-scent food-scent / 1.1
-  ]
-end
+to update-patches
+  ;; Diffuse the pheromones
+  diffuse chemical-return diffusion pheromone-return
+  diffuse pheromone-recruit diffusion pheromone-summon
+  diffuse pheromone-temporal diffusion pheromone-ephemeral
 
-;; @**********@ patch procedure @**********@ ;;
-to diffuse-pheromones
-  diffuse pheromone-recruit ((pheromones-help-evaporation)/ 100)
+  ;; Add the food-scent where we have food
+  ask patches with [food?] [
+    set food-scent 20
+  ]
+  ;; And diffuse it
+  diffuse food-scent 0.5
+
   ask patches [
-    set pheromone-recruit pheromone-recruit * (100 - (pheromones-help-evaporation)) / 100  ;; slowly evaporate chemical
-    recolor-patch
-    ;; We need to lower the general level of food-scent since we are adding more constantly
+    ;; Evaporate pheromones
+    set chemical-return chemical-return * (evaporation pheromone-return)
+    set pheromone-recruit pheromone-recruit * (evaporation pheromone-summon)
+    set pheromone-temporal pheromone-temporal * (evaporation pheromone-ephemeral)
+    ;; Lower the general level of food-scent since we are adding more constantly
     set food-scent food-scent / 1.1
+    ;; Set the color of the patch
+    recolor-patch
   ]
 end
 
@@ -539,19 +539,19 @@ to search
 end
 
 to look-for-food
-   ;; Otherwise follow a pheromone or just search at random
-      ifelse (pheromone-recruit >= 0.05) and (pheromone-recruit < 2) [   ;; original mecanism of pheromone following
-        join-chemical "pheromone"
-      ][
-        ifelse serendipity = 0 and (chemical-return >= 0.05) and (chemical-return < 2) [   ;; original mecanism of pheromone following
-          join-chemical "chemical"
-          ;; Stray the ant from the pheromone trail with a probability setting its serendipity to ignore trails
-          try-stray-from-path
-        ] [
-          wiggle
-          decrease-serendipity
-        ]
-      ]
+  ;; Otherwise follow a pheromone or just search at random
+  ifelse (pheromone-recruit >= 0.05) and (pheromone-recruit < 2) [   ;; original mecanism of pheromone following
+    join-chemical pheromone-summon
+  ][
+    ifelse serendipity = 0 and (chemical-return >= 0.05) and (chemical-return < 2) [   ;; original mecanism of pheromone following
+      join-chemical pheromone-return
+      ;; Stray the ant from the pheromone trail with a probability setting its serendipity to ignore trails
+      try-stray-from-path
+    ] [
+      wiggle
+      decrease-serendipity
+    ]
+  ]
 end
 
 ;; @**********@ agent method @**********@ ;;
@@ -696,6 +696,7 @@ to exploit
     ;; We are not loaded, so we should try to grab food	
     ;; Is there food? ->  Grab it	
     ifelse food? [
+      if exploting-source [ stop ]
       update-memory-and-energy
       record-food-location
       if food-type = 3 and chemical-recruit [ dead-bugs-collection ]
@@ -712,35 +713,34 @@ to exploit
 end
 
 to config-load-and-food
-   ;; Modify the patch and set the load of the ant
-      set loaded? true	
-      set load-type food-type
-      set food? food-type = 4 ;; Don't consume honeydew
-      set exploit-counter -1
-      if not food? [
-        ;; If the food was consumed, remove the food type, fedder number and nutritional value
-        set food-type 0
-        set feedernumber 0
-        set nutritionalQuality 0
-      ]
+  ;; Modify the patch and set the load of the ant
+  set loaded? true	
+  set load-type food-type
+  set food? food-type = 4 ;; Don't consume honeydew
+  set exploit-counter -1
+  if not food? [
+    ;; If the food was consumed, remove the food type, fedder number and nutritional value
+    set food-type 0
+    set feedernumber 0
+    set nutritionalQuality 0
+  ]
 end
 
 to dead-bugs-collection
   ;; The ant needs help to carry the food, lets try to recruit
-        ifelse being-collected = false [
-          ask patches in-radius 7 [set being-collected true]
-          set bug-size measure-bug          ;; see how many comrades would be needed to carry th bug
-          set state "recruiting"
-          stop
-        ]
-        [
-          set state "recruited"
-          stop
-        ]
+  ifelse being-collected = false [
+    ask patches in-radius 7 [set being-collected true]
+    set bug-size measure-bug          ;; see how many comrades would be needed to carry th bug
+    set state "recruiting"
+    stop
+  ]
+  [
+    set state "recruited"
+    stop
+  ]
 end
 
 to update-memory-and-energy
-  if exploting-source [ stop ]
   do-memstrength
   set energy energy + ((nutriQuality-memory / maxNutritionalValue) * 100)
   if energy > 100  [set energy 100]
@@ -776,7 +776,9 @@ to-report exploting-source
   ;; Food sources other than honeydew are exploited instantly and we only exploit for a set number of ticks
   if food-type != 4 or exploit-counter = 0 [ report False ]
   ;; Initiate the exploit counter as needed
-  if exploit-counter = -1 [ set exploit-counter 10 ]
+  if exploit-counter = -1 [
+    set exploit-counter 10
+  ]
   ;; Decrease the exploit counter
   set exploit-counter exploit-counter - 1
   report True
@@ -862,35 +864,6 @@ to find-bug-source
 end
 
 ;; @**********@ agent method @**********@ ;;
-;;to join-chemical [kind]
-  ;;let right-angle 0
-  ;;let left-angle 0
-
-  ;;let scent-ahead chemical-scent-at-angle   0  kind
-  ;;let scent-right45 chemical-scent-at-angle  45  kind
-  ;;let scent-left45  chemical-scent-at-angle -45  kind
-  ;;let scent-right90 chemical-scent-at-angle  90  kind
-  ;;let scent-left-90  chemical-scent-at-angle -90  kind
-
-  ;;ifelse (scent-right45 > scent-right90 )
-  ;;[set right-angle 45]
-  ;;[set right-angle 90]
-
-  ;;ifelse (scent-left45 > scent-left-90 )
-  ;;[set left-angle 45]
-  ;;[set left-angle 90]
-
-  ;;let scent-left chemical-scent-at-angle left-angle kind
-  ;;let scent-right chemical-scent-at-angle right-angle kind
-
-  ;;if ( scent-right > scent-ahead) or ( scent-left > scent-ahead)
-  ;;[ ifelse scent-right > scent-left
-    ;;[ rt right-angle ]
-    ;;[ lt left-angle ]
-  ;;]
-;;end
-
-;; @**********@ agent method @**********@ ;;
 to join-chemical [kind]
   let scent-ahead chemical-scent-at-angle   0  kind
   let scent-right chemical-scent-at-angle  45  kind
@@ -905,12 +878,14 @@ end
 to-report chemical-scent-at-angle [angle kind]
   let p patch-right-and-ahead angle 1
   if p = nobody [ report 0 ]
-  if (kind = "pheromone")[
-    report 0
-    ;;report [pheromone-recruit] of p
+  if kind = pheromone-return [
+    report [ chemical-return ] of p
   ]
-  if (kind = "chemical")[
-     report [chemical-return] of p
+  if kind = pheromone-summon [
+     report [ pheromone-recruit ] of p
+  ]
+  if kind = pheromone-ephemeral [
+     report [ pheromone-ephemeral ] of p
   ]
 end
 
@@ -949,7 +924,7 @@ to recruit-circles
     rt 15
     if not can-move? 1
     [ rt 180 ]
-    set pheromone-recruit pheromone-recruit + 50
+    set pheromone-recruit pheromone-recruit + 1
   ]
   [
     if(loss-count < 103)[	
@@ -1061,12 +1036,12 @@ end
 ;; @**********@ Pheromones helper methods @**********@ ;;	
 to-report evaporation [pheromone]
   ;; gets the evaporation rate for the pheromone index
-  report item (pheromone - 1) pheromones-evaporation
+  report ( 100 - ( item (pheromone - 1) pheromones-evaporation ) ) / 100
 end
 
 to-report diffusion [pheromone]
   ;; gets the diffusion rate for the pheromone index
-  report item (pheromone - 1) pheromones-diffusion
+  report ( item (pheromone - 1) pheromones-diffusion ) / 100
 end
 
 ;; @**********@ Movement helper methods @**********@ ;;	
@@ -1163,10 +1138,10 @@ ticks
 30.0
 
 SLIDER
-24
-40
-215
-73
+27
+135
+218
+168
 population
 population
 1
@@ -1178,10 +1153,10 @@ NIL
 HORIZONTAL
 
 BUTTON
-1282
-53
-1360
-86
+27
+43
+105
+76
 NIL
 setup
 NIL
@@ -1195,10 +1170,10 @@ NIL
 1
 
 BUTTON
-1369
-53
-1448
-86
+114
+43
+193
+76
 go
 set debug False\ngo
 T
@@ -1212,25 +1187,25 @@ NIL
 1
 
 SLIDER
-24
-79
-216
-112
+28
+177
+220
+210
 ran-seed
 ran-seed
 0
 10000
-18.0
+22.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-25
-147
-217
-180
+29
+259
+221
+292
 per_step_max_rotation
 per_step_max_rotation
 0
@@ -1242,10 +1217,10 @@ NIL
 HORIZONTAL
 
 SWITCH
-1283
-101
-1386
-134
+28
+91
+118
+124
 trace?
 trace?
 1
@@ -1253,75 +1228,75 @@ trace?
 -1000
 
 SLIDER
-25
-188
-218
-221
+29
+300
+222
+333
 max_fullness
 max_fullness
 0
 200
-0.0
+40.0
 5
 1
 NIL
 HORIZONTAL
 
 SLIDER
-244
-875
-416
-908
+1284
+62
+1456
+95
 seeds
 seeds
 0
 200
-39.0
+0.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-245
-915
-417
-948
+1285
+102
+1457
+135
 bugs
 bugs
 0
 100
-17.0
+0.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-246
-954
-418
-987
+1286
+141
+1458
+174
 dead-bugs
 dead-bugs
 0
 100
-16.0
+0.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-247
-993
-419
-1026
+1287
+180
+1459
+213
 honeydew
 honeydew
 0
 20
-3.0
+20.0
 1
 1
 NIL
@@ -1350,62 +1325,62 @@ PENS
 "recruiting" 1.0 0 -5207188 true "" "plotxy ticks count ants with [state = \"recruiting\" or state = \"recruited\" or state = \"exploit-bug\"]"
 
 TEXTBOX
-246
-854
-396
-872
+1274
+32
+1424
+51
 Food sources
-11
-0.0
+15
+22.0
 1
 
 TEXTBOX
-27
-479
-177
-497
+32
+738
+182
+756
 Pheromones
 11
 0.0
 1
 
 INPUTBOX
-24
-498
-220
-558
+29
+757
+225
+817
 pheromone-diffusion-rates
-[ 2 0 100 ]
+[ 0 1 2 ]
 1
 0
 String
 
 INPUTBOX
-25
-563
-220
-623
+30
+822
+225
+882
 pheromone-evaporation-rates
-[ 5 0.01 20 ]
+[ 0 2 5 ]
 1
 0
 String
 
 CHOOSER
-122
-631
-224
-676
+191
+889
+315
+934
 pheromone-return
 pheromone-return
 1 2 3
-1
+0
 
 SLIDER
-437
-876
-635
-909
+1477
+63
+1675
+96
 seeds-spawn-probability
 seeds-spawn-probability
 0
@@ -1417,10 +1392,10 @@ seeds-spawn-probability
 HORIZONTAL
 
 SLIDER
-438
-913
-635
-946
+1478
+100
+1675
+133
 bugs-spawn-probability
 bugs-spawn-probability
 0
@@ -1432,10 +1407,10 @@ bugs-spawn-probability
 HORIZONTAL
 
 SLIDER
-439
-953
-636
-986
+1479
+140
+1676
+173
 dead-bugs-spawn-probability
 dead-bugs-spawn-probability
 0
@@ -1447,35 +1422,35 @@ dead-bugs-spawn-probability
 HORIZONTAL
 
 SLIDER
-25
-393
-219
-426
+29
+505
+223
+538
 stray-probability
 stray-probability
 0
 5
-5.0
+0.11
 0.01
 1
 %
 HORIZONTAL
 
 TEXTBOX
-29
-276
-179
-294
+33
+388
+183
+406
 Memory\n
 11
 0.0
 1
 
 SLIDER
-27
-310
-220
-343
+31
+422
+224
+455
 max-memory
 max-memory
 0
@@ -1487,91 +1462,91 @@ NIL
 HORIZONTAL
 
 SWITCH
-1395
-102
-1499
-135
+121
+91
+220
+124
 fixed-food?
 fixed-food?
-1
+0
 1
 -1000
 
 SLIDER
-25
-435
-220
-468
+29
+547
+224
+580
 random-serendipity
 random-serendipity
 0
 100
-65.0
+20.0
 1
 1
 NIL
 HORIZONTAL
 
 SWITCH
-26
-631
-116
-664
-deposit-pheromone
-deposit-pheromone
-0
-1
--1000
-
-SWITCH
-96
-266
-219
-299
-memory-on
-memory-on
-0
-1
--1000
-
-SWITCH
-26
-752
-179
-785
-mechanical-recruit
-mechanical-recruit
-0
-1
--1000
-
-SWITCH
-26
-682
-116
-715
-chemical-recruit
-chemical-recruit
-0
-1
--1000
-
-SWITCH
-96
-351
-219
-384
-serendipity-on
-serendipity-on
-1
-1
--1000
-
-SWITCH
-26
-833
+35
+890
 182
-866
+923
+deposit-pheromone
+deposit-pheromone
+0
+1
+-1000
+
+SWITCH
+100
+378
+223
+411
+memory-on
+memory-on
+0
+1
+-1000
+
+SWITCH
+31
+615
+184
+648
+mechanical-recruit
+mechanical-recruit
+0
+1
+-1000
+
+SWITCH
+36
+942
+183
+975
+chemical-recruit
+chemical-recruit
+0
+1
+-1000
+
+SWITCH
+100
+463
+223
+496
+serendipity-on
+serendipity-on
+1
+1
+-1000
+
+SWITCH
+31
+696
+187
+729
 return-nest-direct
 return-nest-direct
 0
@@ -1579,10 +1554,10 @@ return-nest-direct
 -1000
 
 TEXTBOX
-24
-729
-174
-747
+29
+592
+179
+610
 Other
 11
 0.0
@@ -1701,71 +1676,61 @@ PENS
 "pen-4" 1.0 2 -1184463 true "" "plotxy ticks count ants with [f-type-memory = 4]"
 
 SWITCH
-26
-792
-180
-825
+31
+655
+185
+688
 prelation
 prelation
-0
+1
 1
 -1000
 
 TEXTBOX
-27
-362
-90
-380
+31
+474
+94
+492
 Serendipity
 11
 0.0
 1
 
 CHOOSER
-123
-683
-224
-728
-pheromone-group
-pheromone-group
+190
+942
+317
+987
+pheromone-summon
+pheromone-summon
 1 2 3
-0
-
-TEXTBOX
-13
-16
-163
-34
-Simulation
-14
-23.0
 1
 
 TEXTBOX
-13
-123
-163
-141
+17
+226
+167
+245
 Ant values
-11
-0.0
+15
+22.0
 1
 
 TEXTBOX
-14
-242
-164
-260
+18
+354
+168
+372
 Mechanisms
 14
 23.0
 1
 
 TEXTBOX
-1272
-26
-1422
-45
+16
+16
+166
+35
 Execution
 15
 22.0
@@ -1779,6 +1744,46 @@ TEXTBOX
 Output
 15
 22.0
+1
+
+CHOOSER
+189
+997
+318
+1042
+pheromone-ephemeral
+pheromone-ephemeral
+1 2 3
+2
+
+TEXTBOX
+325
+898
+476
+926
+to indicate a permanent food source (honeydew)
+11
+0.0
+1
+
+TEXTBOX
+325
+949
+475
+977
+to recruit to carry large food sources
+11
+0.0
+1
+
+TEXTBOX
+327
+1005
+477
+1033
+to indicate a temporal food source
+11
+0.0
 1
 
 @#$#@#$#@
