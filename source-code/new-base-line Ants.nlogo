@@ -214,7 +214,7 @@ to setup-ants
     set energy 50
     set f-type-memory 0
     set exploit-counter -1
-    if prelation [  if who >= prelationNumber [set prelationHD true]  ]
+    set prelationHD prelation and who >= prelationNumber
     reset-waypoints
   ]
 end
@@ -296,8 +296,7 @@ end
 to spread-food [ftype last-feed-num x-coord y-coord food-size]
   let nutriQuality 0
   ifelse ftype = 4
-    [set nutriQuality one-of[ 20 20 20 40 40 60 ]
-    print word "nutriQuality: " nutriQuality]
+    [ set nutriQuality one-of[ 20 20 20 40 40 60 ] ]
     [set nutriQuality ((random 10) + 1) * ftype]
   ask patches in-radius food-size [
     set food-type ftype
@@ -558,13 +557,13 @@ end
 to-report should-exploit?
   ;; Checks if the ant should transition to the exploit status
   ;; If we are not in a food location or perceive food scent, do not transition
-  if not food? OR food-scent < 0.1 [ report False ]
+  if not food? AND food-scent < 0.1 [ report False ]
   ;; If we are not looking for a new food source and arrive at our prefered food source, exploit!
   if serendipity <= 0 AND f-memory = feedernumber [ report True ]
   ;; we should also exploit if we find a new food source while looking for one
   if serendipity > 0 AND f-memory = feedernumber [ report False ]
   ;; if this is one of the ants with Honwy dew prelation and it finds a food source other than HD it ignores it
-  if (prelationHD = true) AND (food-type != 4)  [report false]
+  if prelationHD AND (food-type != 4)  [report false]
   ;; If we get here this is the first food souce found by the ant, exploit!
   report True
 end
@@ -1195,7 +1194,7 @@ ran-seed
 ran-seed
 0
 10000
-22.0
+30.0
 1
 1
 NIL
@@ -1251,7 +1250,7 @@ seeds
 seeds
 0
 200
-0.0
+60.0
 1
 1
 NIL
@@ -1266,7 +1265,7 @@ bugs
 bugs
 0
 100
-0.0
+21.0
 1
 1
 NIL
@@ -1281,7 +1280,7 @@ dead-bugs
 dead-bugs
 0
 100
-0.0
+26.0
 1
 1
 NIL
@@ -1296,7 +1295,7 @@ honeydew
 honeydew
 0
 20
-20.0
+7.0
 1
 1
 NIL
