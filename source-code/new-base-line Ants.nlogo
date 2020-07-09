@@ -127,13 +127,13 @@ to prepare-csv-file
 end
 
 to writeCSVrow [#fname #vals]
-  file-open #fname
-  file-type first #vals
-  foreach but-first #vals [[?] ->
-    file-type "," file-type ?
-  ]
-  file-print ""  ;;terminate line with CR
-  file-close
+  ;file-open #fname
+  ;file-type first #vals
+  ;foreach but-first #vals [[?] ->
+  ;  file-type "," file-type ?
+  ;]
+  ;file-print ""  ;;terminate line with CR
+  ;file-close
 end
 
 to writeListToFile [#mylist #fname]
@@ -1110,10 +1110,10 @@ to move-forward
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-245
-24
-1257
-837
+215
+13
+1227
+826
 -1
 -1
 4.0
@@ -1137,25 +1137,25 @@ ticks
 30.0
 
 SLIDER
-27
-135
-218
-168
+9
+124
+209
+158
 population
 population
 1
 100
-100.0
+1.0
 1
 1
 NIL
 HORIZONTAL
 
 BUTTON
-27
-43
-105
-76
+7
+34
+85
+67
 NIL
 setup
 NIL
@@ -1169,10 +1169,10 @@ NIL
 1
 
 BUTTON
-114
-43
-193
-76
+92
+34
+171
+67
 go
 set debug False\ngo
 T
@@ -1186,40 +1186,40 @@ NIL
 1
 
 SLIDER
-28
-177
-220
-210
+10
+170
+208
+204
 ran-seed
 ran-seed
 0
 10000
-30.0
+0.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-29
-259
-221
-292
+10
+242
+208
+276
 per_step_max_rotation
 per_step_max_rotation
 0
 180
-35.0
+60.0
 5
 1
 NIL
 HORIZONTAL
 
 SWITCH
-28
-91
-118
-124
+7
+79
+97
+112
 trace?
 trace?
 1
@@ -1227,85 +1227,85 @@ trace?
 -1000
 
 SLIDER
-29
-300
-222
-333
+10
+288
+208
+322
 max_fullness
 max_fullness
 0
 200
-40.0
+80.0
 5
 1
 NIL
 HORIZONTAL
 
 SLIDER
-1284
-62
-1456
-95
+12
+360
+209
+394
 seeds
 seeds
 0
 200
-60.0
+0.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-1285
-102
-1457
-135
+12
+453
+209
+487
 bugs
 bugs
 0
 100
-21.0
+0.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-1286
-141
-1458
-174
+12
+543
+207
+577
 dead-bugs
 dead-bugs
 0
 100
-26.0
+0.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-1287
-180
-1459
-213
+12
+637
+207
+671
 honeydew
 honeydew
 0
 20
-7.0
+20.0
 1
 1
 NIL
 HORIZONTAL
 
 PLOT
-1286
-614
-1564
-834
+1565
+482
+1869
+747
 Ants by State
 NIL
 NIL
@@ -1324,62 +1324,52 @@ PENS
 "recruiting" 1.0 0 -5207188 true "" "plotxy ticks count ants with [state = \"recruiting\" or state = \"recruited\" or state = \"exploit-bug\"]"
 
 TEXTBOX
-1274
-32
-1424
-51
+12
+335
+162
+354
 Food sources
 15
 22.0
 1
 
-TEXTBOX
-32
-738
-182
-756
-Pheromones
-11
-0.0
-1
-
 INPUTBOX
-29
-757
-225
-817
+1393
+115
+1507
+183
 pheromone-diffusion-rates
-[ 0 1 2 ]
+[ 3 0.1 0.3 ]
 1
 0
 String
 
 INPUTBOX
-30
-822
-225
-882
+1509
+115
+1633
+183
 pheromone-evaporation-rates
-[ 0 2 5 ]
+[ 0 3 0.1 ]
 1
 0
 String
 
 CHOOSER
-191
-889
-315
-934
+1635
+115
+1759
+160
 pheromone-return
 pheromone-return
 1 2 3
-0
+2
 
 SLIDER
-1477
-63
-1675
-96
+12
+399
+210
+433
 seeds-spawn-probability
 seeds-spawn-probability
 0
@@ -1391,10 +1381,10 @@ seeds-spawn-probability
 HORIZONTAL
 
 SLIDER
-1478
-100
-1675
-133
+12
+490
+209
+523
 bugs-spawn-probability
 bugs-spawn-probability
 0
@@ -1406,10 +1396,10 @@ bugs-spawn-probability
 HORIZONTAL
 
 SLIDER
-1479
-140
-1676
-173
+12
+582
+209
+616
 dead-bugs-spawn-probability
 dead-bugs-spawn-probability
 0
@@ -1421,10 +1411,10 @@ dead-bugs-spawn-probability
 HORIZONTAL
 
 SLIDER
-29
-505
-223
-538
+1559
+282
+1723
+316
 stray-probability
 stray-probability
 0
@@ -1435,21 +1425,11 @@ stray-probability
 %
 HORIZONTAL
 
-TEXTBOX
-33
-388
-183
-406
-Memory\n
-11
-0.0
-1
-
 SLIDER
-31
-422
-224
-455
+1393
+193
+1557
+227
 max-memory
 max-memory
 0
@@ -1461,21 +1441,21 @@ NIL
 HORIZONTAL
 
 SWITCH
-121
-91
-220
-124
+100
+79
+208
+113
 fixed-food?
 fixed-food?
-0
+1
 1
 -1000
 
 SLIDER
-29
-547
-224
-580
+1393
+282
+1557
+316
 random-serendipity
 random-serendipity
 0
@@ -1487,10 +1467,10 @@ NIL
 HORIZONTAL
 
 SWITCH
-35
-890
-182
-923
+1238
+115
+1390
+149
 deposit-pheromone
 deposit-pheromone
 0
@@ -1498,43 +1478,43 @@ deposit-pheromone
 -1000
 
 SWITCH
-100
-378
-223
-411
+1238
+193
+1390
+227
 memory-on
 memory-on
-0
+1
 1
 -1000
 
 SWITCH
-31
-615
-184
-648
+1238
+237
+1390
+271
 mechanical-recruit
 mechanical-recruit
-0
+1
 1
 -1000
 
 SWITCH
-36
-942
+1238
+149
+1390
 183
-975
 chemical-recruit
 chemical-recruit
-0
+1
 1
 -1000
 
 SWITCH
-100
-463
-223
-496
+1238
+282
+1390
+316
 serendipity-on
 serendipity-on
 1
@@ -1542,31 +1522,21 @@ serendipity-on
 -1000
 
 SWITCH
-31
-696
-187
-729
+1238
+37
+1390
+71
 return-nest-direct
 return-nest-direct
 0
 1
 -1000
-
-TEXTBOX
-29
-592
-179
-610
-Other
-11
-0.0
-1
 
 MONITOR
-1287
-372
-1396
-417
+1238
+428
+1347
+473
 memory-switches
 memory-switches
 17
@@ -1574,10 +1544,10 @@ memory-switches
 11
 
 PLOT
-1287
-479
-1466
-603
+1238
+482
+1566
+612
 colony enegy
 NIL
 NIL
@@ -1596,10 +1566,10 @@ PENS
 "collectedprotein" 1.0 0 -15637942 true "" "plotxy ticks / 30 protein-colleted * 20"
 
 SLIDER
-1286
-331
-1458
-364
+1237
+385
+1409
+418
 ticks-per-day
 ticks-per-day
 0
@@ -1611,20 +1581,20 @@ ticks
 HORIZONTAL
 
 TEXTBOX
-1288
-315
-1438
-333
+1239
+369
+1389
+387
 Ticks per checkpoint
 11
 0.0
 1
 
 MONITOR
-1405
-425
-1515
-470
+1458
+428
+1568
+473
 amount-collected
 food-collected-day
 17
@@ -1632,10 +1602,10 @@ food-collected-day
 11
 
 MONITOR
-1288
-424
-1397
-469
+1568
+428
+1677
+473
 elapsed-days
 elapsed-days
 17
@@ -1643,10 +1613,10 @@ elapsed-days
 11
 
 MONITOR
-1404
-372
-1514
-417
+1348
+428
+1458
+473
 energy-avg
 energy-avg
 3
@@ -1654,10 +1624,10 @@ energy-avg
 11
 
 PLOT
-1470
-478
-1636
-603
+1238
+612
+1566
+747
 ants by food type
 NIL
 NIL
@@ -1675,111 +1645,101 @@ PENS
 "pen-4" 1.0 2 -1184463 true "" "plotxy ticks count ants with [f-type-memory = 4]"
 
 SWITCH
-31
-655
-185
-688
+1238
+70
+1390
+104
 prelation
 prelation
 1
 1
 -1000
 
-TEXTBOX
-31
-474
-94
-492
-Serendipity
-11
-0.0
-1
-
 CHOOSER
-190
-942
-317
-987
+1635
+160
+1760
+205
 pheromone-summon
 pheromone-summon
 1 2 3
 1
 
 TEXTBOX
-17
-226
-167
-245
+13
+218
+163
+237
 Ant values
 15
 22.0
 1
 
 TEXTBOX
-18
-354
-168
-372
+1238
+15
+1388
+33
 Mechanisms
 14
 23.0
 1
 
 TEXTBOX
-16
-16
-166
-35
+9
+13
+159
+32
 Execution
 15
 22.0
 1
 
 TEXTBOX
-1276
-281
-1426
-300
+1238
+342
+1388
+361
 Output
 15
 22.0
 1
 
 CHOOSER
-189
-997
-318
-1042
+1635
+205
+1760
+250
 pheromone-ephemeral
 pheromone-ephemeral
 1 2 3
 2
 
 TEXTBOX
-325
-898
-476
-926
+1765
+114
+1867
+164
 to indicate a permanent food source (honeydew)
 11
 0.0
 1
 
 TEXTBOX
-325
-949
-475
-977
+1764
+160
+1851
+203
 to recruit to carry large food sources
 11
 0.0
 1
 
 TEXTBOX
-327
-1005
-477
-1033
+1764
+205
+1862
+248
 to indicate a temporal food source
 11
 0.0
