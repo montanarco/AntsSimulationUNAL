@@ -906,7 +906,6 @@ end
 
 ;; @**********@ agent method @**********@ ;;
 to increase-chemical [kind increase-by]
-  print list kind increase-by
   if kind = pheromone-return [
     set chemical-return chemical-return + increase-by
   ]
@@ -1207,7 +1206,7 @@ population
 population
 1
 100
-1.0
+50.0
 1
 1
 NIL
@@ -1284,7 +1283,7 @@ SWITCH
 112
 trace?
 trace?
-0
+1
 1
 -1000
 
@@ -1412,7 +1411,7 @@ INPUTBOX
 1633
 183
 pheromone-evaporation-rates
-[ 0 3 0.1 ]
+[ 0 3 3 ]
 1
 0
 String
