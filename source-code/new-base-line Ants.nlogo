@@ -906,23 +906,17 @@ end
 
 ;; @**********@ agent method @**********@ ;;
 to increase-chemical [kind increase-by]
-  let new-value ( chemical-scent kind ) + increase-by
-  set-chemical kind new-value
-end
-
-;; @**********@ agent method @**********@ ;;
-to set-chemical [kind value]
+  print list kind increase-by
   if kind = pheromone-return [
-    set chemical-return value
+    set chemical-return chemical-return + increase-by
   ]
   if kind = pheromone-summon [
-     set chemical-summon value
+     set chemical-summon chemical-summon + increase-by
   ]
   if kind = pheromone-ephemeral [
-     set chemical-ephemeral value
+     set chemical-ephemeral chemical-ephemeral + increase-by
   ]
 end
-
 
 
 ;; @**********@ agent method @**********@ ;;
@@ -1030,11 +1024,10 @@ to deposit-chemical
   let value-to-deposit (0.0005 * (nutriQuality-memory * 2)) ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
   let pheromone-kind pheromone-ephemeral ;; By default we use the ephemeral pheromone
 
-  if load-type = 4 or chemical-scent pheromone-return > 0 [
+  if load-type = 4 or chemical-return > 0 [
     ;; Unless we are carrying honeydew or are on top of a long term trail where we should use the long term pheromone
     set pheromone-kind pheromone-return
   ]
-
   increase-chemical pheromone-kind value-to-deposit
 end
 
@@ -1291,7 +1284,7 @@ SWITCH
 112
 trace?
 trace?
-1
+0
 1
 -1000
 
@@ -1432,7 +1425,7 @@ CHOOSER
 pheromone-return
 pheromone-return
 1 2 3
-2
+0
 
 SLIDER
 12
