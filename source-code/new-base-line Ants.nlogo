@@ -342,13 +342,13 @@ to recolor-patch
       set pcolor scale-color pink food-scent 0.1 20
       ;; If there is a trace of pheromone show it
       if chemical-return > 0.1 [
-        set pcolor scale-color green chemical-return 0 1
+        set pcolor scale-color green chemical-return 0 0.5
       ]
       if chemical-summon > 0.1 [
-        set pcolor scale-color brown chemical-summon 0 5
+        set pcolor scale-color brown chemical-summon 0 0.5
       ]
       if chemical-ephemeral > 0.1 [
-        set pcolor scale-color blue chemical-ephemeral 0 1
+        set pcolor scale-color blue chemical-ephemeral 0 0.5
       ]
     ]
   ]
@@ -559,6 +559,8 @@ end
 ;; @**********@ agent method @**********@ ;;
 to-report should-exploit?
   ;; Checks if the ant should transition to the exploit status
+  ;; If the ant is loaded as is not a leader, transition
+  if loaded? and not leader [ report True ]
   ;; If we are not in a food location or perceive food scent, do not transition
   if not food? AND food-scent < 0.1 [ report False ]
   ;; If we are not looking for a new food source and arrive at our prefered food source, exploit!
@@ -566,7 +568,7 @@ to-report should-exploit?
   ;; we should also exploit if we find a new food source while looking for one
   if serendipity > 0 AND f-memory = feedernumber [ report False ]
   ;; if this is one of the ants with Honwy dew prelation and it finds a food source other than HD it ignores it
-  if prelationHD AND (food-type != 4)  [report false]
+  if prelationHD AND (food-type != 4)  [report False]
   ;; If we get here this is the first food souce found by the ant, exploit!
   report True
 end
@@ -928,7 +930,7 @@ end
 to-report perceives-scent? [kind]
   ;; Checks if the ant perceives a pheromone within a threshold
   let pheromone chemical-scent kind
-  report between pheromone 0.05 2
+  report pheromone > 0.1
 end
 
 ;; @**********@ patch procedure @**********@ ;;
@@ -999,7 +1001,7 @@ end
 to return-to-nest
   ifelse return-nest-direct [
     if load-type != 1 or load-type != 3 [ ;; if we are harvesting seeds or bug there is no need to leave a pheromene trail
-      deposit-chemical
+      deposit-trail-chemical
       set leader false
     ]
     ;; this is to say that the ant has memory of nest location so it heads toward the next to return
@@ -1017,16 +1019,24 @@ to return-to-nest
 end
 
 ;; @**********@ agent method @**********@ ;;
-to deposit-chemical
+to deposit-trail-chemical
   ;; Deposit the chemical related to trail pheromones depending on the food being carried
-  if not deposit-pheromone [ stop ]
+  ;; No trail is set for food that can be collected in one go (seeds) or that needs to be collected as an unit by a set of ants (dead bugs)
+  if not deposit-pheromone or not loaded? or load-type = 1 or load-type = 3 [ stop ]
+
   let value-to-deposit (0.0005 * (nutriQuality-memory * 2)) ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
   let pheromone-kind pheromone-ephemeral ;; By default we use the ephemeral pheromone
 
-  if load-type = 4 or chemical-return > 0.1 [
-    ;; Unless we are carrying honeydew or are on top of a long term trail where we should use the long term pheromone
+  ifelse load-type = 4 [
+    ;; If the ant is carryng honeydew or walking over a trail with existing return pheromone
+    ;; use the return pheromone
     set pheromone-kind pheromone-return
+  ] [
+    ;; If using a pheromone other than the return pheromone, increase its intensity
+    set value-to-deposit value-to-deposit * 10
   ]
+
+  ;; Finally, increase the pheromone where the ant is
   increase-chemical pheromone-kind value-to-deposit
 end
 
@@ -1097,11 +1107,6 @@ end
 to-report diffusion [pheromone]
   ;; gets the diffusion rate for the pheromone index
   report ( item (pheromone - 1) pheromones-diffusion ) / 100
-end
-
-to-report between [val valMin valMax]
-  ;; Checks if val is in the interval [valMin, ValMax)
-  report val >= valMin and val < valMax
 end
 
 ;; @**********@ Movement helper methods @**********@ ;;	
