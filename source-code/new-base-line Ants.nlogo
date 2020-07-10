@@ -537,13 +537,16 @@ to search
   set steps steps + 1
 end
 
+;; @**********@ agent method @**********@ ;;
 to look-for-food
   ;; Otherwise follow a pheromone or just search at random
-  ifelse (chemical-summon >= 0.05) and (chemical-summon < 2) [   ;; original mecanism of pheromone following
+  ifelse perceives-scent? pheromone-summon [   ;; original mecanism of pheromone following
     join-chemical pheromone-summon
   ][
-    ifelse serendipity = 0 and (chemical-return >= 0.05) and (chemical-return < 2) [   ;; original mecanism of pheromone following
+    ifelse serendipity = 0 and perceives-trail? [   ;; original mecanism of pheromone following
+      ;; Change the ant orientation depending on the pheromone that was perceived
       join-chemical pheromone-return
+      join-chemical pheromone-ephemeral ;; If this pheromone exists it recieves priority as it is evaluated last and should be less prevalent
       ;; Stray the ant from the pheromone trail with a probability setting its serendipity to ignore trails
       try-stray-from-path
     ] [
@@ -864,6 +867,8 @@ end
 
 ;; @**********@ agent method @**********@ ;;
 to join-chemical [kind]
+  ;; Only joins if there is some traces of the kind of pheromones we are looking for
+  if chemical-scent kind < 0.05 [ stop ]
   let scent-ahead chemical-scent-at-angle   0  kind
   let scent-right chemical-scent-at-angle  45  kind
   let scent-left  chemical-scent-at-angle -45  kind
@@ -873,19 +878,64 @@ to join-chemical [kind]
     [ lt 45 ] ]
 end
 
-;; @**********@ patch procedure @**********@ ;;
+;; @**********@ agent method @**********@ ;;
+to-report chemical-scent [kind]
+  report chemical-scent-at-patch patch-here kind
+end
+
+;; @**********@ agent method @**********@ ;;
 to-report chemical-scent-at-angle [angle kind]
   let p patch-right-and-ahead angle 1
   if p = nobody [ report 0 ]
+  report chemical-scent-at-patch p kind
+end
+
+;; @**********@ agent method @**********@ ;;
+to-report chemical-scent-at-patch [patch-to-check kind]
   if kind = pheromone-return [
-    report [ chemical-return ] of p
+     report [ chemical-return ] of patch-to-check
   ]
   if kind = pheromone-summon [
-     report [ chemical-summon ] of p
+     report [ chemical-summon ] of patch-to-check
   ]
   if kind = pheromone-ephemeral [
-     report [ chemical-ephemeral ] of p
+     report [ chemical-ephemeral ] of patch-to-check
   ]
+  report 0
+end
+
+;; @**********@ agent method @**********@ ;;
+to increase-chemical [kind increase-by]
+  let new-value ( chemical-scent kind ) + increase-by
+  set-chemical kind new-value
+end
+
+;; @**********@ agent method @**********@ ;;
+to set-chemical [kind value]
+  if kind = pheromone-return [
+    set chemical-return value
+  ]
+  if kind = pheromone-summon [
+     set chemical-summon value
+  ]
+  if kind = pheromone-ephemeral [
+     set chemical-ephemeral value
+  ]
+end
+
+
+
+;; @**********@ agent method @**********@ ;;
+to-report perceives-trail?
+  ;; Checks if the ant perceives any of the pheromones related to trails
+  report perceives-scent? pheromone-return or perceives-scent? pheromone-ephemeral
+end
+
+;; @**********@ agent method @**********@ ;;
+to-report perceives-scent? [kind]
+  ;; Checks if the ant perceives a pheromone within a threshold
+  let pheromone chemical-scent kind
+  report between pheromone 0.05 2
 end
 
 ;; @**********@ patch procedure @**********@ ;;
@@ -956,8 +1006,7 @@ end
 to return-to-nest
   ifelse return-nest-direct [
     if load-type != 1 or load-type != 3 [ ;; if we are harvesting seeds or bug there is no need to leave a pheromene trail
-      if deposit-pheromone
-      [ set chemical-return chemical-return + (0.0005 * (nutriQuality-memory * 2))] ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
+      deposit-chemical
       set leader false
     ]
     ;; this is to say that the ant has memory of nest location so it heads toward the next to return
@@ -972,6 +1021,21 @@ to return-to-nest
   ]
   [wiggle]
   move-forward
+end
+
+;; @**********@ agent method @**********@ ;;
+to deposit-chemical
+  ;; Deposit the chemical related to trail pheromones depending on the food being carried
+  if not deposit-pheromone [ stop ]
+  let value-to-deposit (0.0005 * (nutriQuality-memory * 2)) ;; this cause that the amount of pheromone change acording to the nutitional value the ant is carring
+  let pheromone-kind pheromone-ephemeral ;; By default we use the ephemeral pheromone
+
+  if load-type = 4 or chemical-scent pheromone-return > 0 [
+    ;; Unless we are carrying honeydew or are on top of a long term trail where we should use the long term pheromone
+    set pheromone-kind pheromone-return
+  ]
+
+  increase-chemical pheromone-kind value-to-deposit
 end
 
 to return-to-nest-bug
@@ -1041,6 +1105,11 @@ end
 to-report diffusion [pheromone]
   ;; gets the diffusion rate for the pheromone index
   report ( item (pheromone - 1) pheromones-diffusion ) / 100
+end
+
+to-report between [val valMin valMax]
+  ;; Checks if val is in the interval [valMin, ValMax)
+  report val >= valMin and val < valMax
 end
 
 ;; @**********@ Movement helper methods @**********@ ;;	
@@ -1447,7 +1516,7 @@ SWITCH
 112
 fixed-food?
 fixed-food?
-1
+0
 1
 -1000
 
