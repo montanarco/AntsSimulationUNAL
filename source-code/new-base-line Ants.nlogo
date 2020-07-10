@@ -78,8 +78,8 @@ ants-own [              ;; ant atributes
 
 patches-own [
   chemical-return      ;; amount of pheromone for long standing food sources on this patch
-  pheromone-recruit    ;; a type of pheromone that is droped when help to carry big food source is requiered
-  pheromone-temporal   ;; a type of pheromore for temporal food sources
+  chemical-summon      ;; a type of pheromone that is droped when help to carry big food source is requiered
+  chemical-ephemeral   ;; a type of pheromore for temporal food sources
   food?                ;; is there food on this patch?
   food-type            ;; type of food in this patch if any - 0: none - 1: seed - 2: bug - 3: dead bugs - 4 : honeydew}
   being-collected      ;; helps ants in chemical recruitment to know to wait in order to exploit a deadbug
@@ -344,11 +344,11 @@ to recolor-patch
       if chemical-return > 0.1 [
         set pcolor scale-color green chemical-return 0 1
       ]
-      if pheromone-recruit > 0.1 [
-        set pcolor scale-color brown pheromone-recruit 0 5
+      if chemical-summon > 0.1 [
+        set pcolor scale-color brown chemical-summon 0 5
       ]
-      if pheromone-temporal > 0.1 [
-        set pcolor scale-color blue pheromone-temporal 0 1
+      if chemical-ephemeral > 0.1 [
+        set pcolor scale-color blue chemical-ephemeral 0 1
       ]
     ]
   ]
@@ -466,8 +466,8 @@ end
 to update-patches
   ;; Diffuse the pheromones
   diffuse chemical-return diffusion pheromone-return
-  diffuse pheromone-recruit diffusion pheromone-summon
-  diffuse pheromone-temporal diffusion pheromone-ephemeral
+  diffuse chemical-summon diffusion pheromone-summon
+  diffuse chemical-ephemeral diffusion pheromone-ephemeral
 
   ;; Add the food-scent where we have food
   ask patches with [food?] [
@@ -479,8 +479,8 @@ to update-patches
   ask patches [
     ;; Evaporate pheromones
     set chemical-return chemical-return * (evaporation pheromone-return)
-    set pheromone-recruit pheromone-recruit * (evaporation pheromone-summon)
-    set pheromone-temporal pheromone-temporal * (evaporation pheromone-ephemeral)
+    set chemical-summon chemical-summon * (evaporation pheromone-summon)
+    set chemical-ephemeral chemical-ephemeral * (evaporation pheromone-ephemeral)
     ;; Lower the general level of food-scent since we are adding more constantly
     set food-scent food-scent / 1.1
     ;; Set the color of the patch
@@ -539,7 +539,7 @@ end
 
 to look-for-food
   ;; Otherwise follow a pheromone or just search at random
-  ifelse (pheromone-recruit >= 0.05) and (pheromone-recruit < 2) [   ;; original mecanism of pheromone following
+  ifelse (chemical-summon >= 0.05) and (chemical-summon < 2) [   ;; original mecanism of pheromone following
     join-chemical pheromone-summon
   ][
     ifelse serendipity = 0 and (chemical-return >= 0.05) and (chemical-return < 2) [   ;; original mecanism of pheromone following
@@ -881,10 +881,10 @@ to-report chemical-scent-at-angle [angle kind]
     report [ chemical-return ] of p
   ]
   if kind = pheromone-summon [
-     report [ pheromone-recruit ] of p
+     report [ chemical-summon ] of p
   ]
   if kind = pheromone-ephemeral [
-     report [ pheromone-ephemeral ] of p
+     report [ chemical-ephemeral ] of p
   ]
 end
 
@@ -923,7 +923,7 @@ to recruit-circles
     rt 15
     if not can-move? 1
     [ rt 180 ]
-    set pheromone-recruit pheromone-recruit + 1
+    set chemical-summon chemical-summon + 1
   ]
   [
     if(loss-count < 103)[	
@@ -1140,7 +1140,7 @@ SLIDER
 9
 124
 209
-158
+157
 population
 population
 1
@@ -1189,7 +1189,7 @@ SLIDER
 10
 170
 208
-204
+203
 ran-seed
 ran-seed
 0
@@ -1204,7 +1204,7 @@ SLIDER
 10
 242
 208
-276
+275
 per_step_max_rotation
 per_step_max_rotation
 0
@@ -1230,7 +1230,7 @@ SLIDER
 10
 288
 208
-322
+321
 max_fullness
 max_fullness
 0
@@ -1245,7 +1245,7 @@ SLIDER
 12
 360
 209
-394
+393
 seeds
 seeds
 0
@@ -1260,7 +1260,7 @@ SLIDER
 12
 453
 209
-487
+486
 bugs
 bugs
 0
@@ -1275,7 +1275,7 @@ SLIDER
 12
 543
 207
-577
+576
 dead-bugs
 dead-bugs
 0
@@ -1290,7 +1290,7 @@ SLIDER
 12
 637
 207
-671
+670
 honeydew
 honeydew
 0
@@ -1369,7 +1369,7 @@ SLIDER
 12
 399
 210
-433
+432
 seeds-spawn-probability
 seeds-spawn-probability
 0
@@ -1399,7 +1399,7 @@ SLIDER
 12
 582
 209
-616
+615
 dead-bugs-spawn-probability
 dead-bugs-spawn-probability
 0
@@ -1414,7 +1414,7 @@ SLIDER
 1559
 282
 1723
-316
+315
 stray-probability
 stray-probability
 0
@@ -1429,7 +1429,7 @@ SLIDER
 1393
 193
 1557
-227
+226
 max-memory
 max-memory
 0
@@ -1444,7 +1444,7 @@ SWITCH
 100
 79
 208
-113
+112
 fixed-food?
 fixed-food?
 1
@@ -1455,7 +1455,7 @@ SLIDER
 1393
 282
 1557
-316
+315
 random-serendipity
 random-serendipity
 0
@@ -1470,7 +1470,7 @@ SWITCH
 1238
 115
 1390
-149
+148
 deposit-pheromone
 deposit-pheromone
 0
@@ -1481,7 +1481,7 @@ SWITCH
 1238
 193
 1390
-227
+226
 memory-on
 memory-on
 1
@@ -1492,7 +1492,7 @@ SWITCH
 1238
 237
 1390
-271
+270
 mechanical-recruit
 mechanical-recruit
 1
@@ -1503,7 +1503,7 @@ SWITCH
 1238
 149
 1390
-183
+182
 chemical-recruit
 chemical-recruit
 1
@@ -1514,7 +1514,7 @@ SWITCH
 1238
 282
 1390
-316
+315
 serendipity-on
 serendipity-on
 1
@@ -1525,7 +1525,7 @@ SWITCH
 1238
 37
 1390
-71
+70
 return-nest-direct
 return-nest-direct
 0
@@ -1648,7 +1648,7 @@ SWITCH
 1238
 70
 1390
-104
+103
 prelation
 prelation
 1
