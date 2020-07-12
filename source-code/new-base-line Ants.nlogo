@@ -52,6 +52,7 @@ ants-own [              ;; ant atributes
   load-type             ;; type of food being transported by the ant
   steps                 ;; number of steps the ant do to after leaving the nest and until it find a food location
   loss-count            ;; this variable determines when an ant is lost
+  loss-scent
   fullness              ;; this variable measures if the ant feels hungry, so it can start looking for food
   energy                ;; this measures the enegetic expense of the colony while looking foor food.
   f-memory              ;; indicate if the ant have found any food source
@@ -215,6 +216,7 @@ to setup-ants
     set f-type-memory 0
     set exploit-counter -1
     set prelationHD prelation and who >= prelationNumber
+    set loss-scent 0
     reset-waypoints
   ]
 end
@@ -524,7 +526,7 @@ to search
   [
     ;; when the ant remembers a location where it has found any food, it goes back to check if there is more unless it is trying to search for more sources
     ifelse serendipity = 0 AND f-memory != 0 [
-      ;;go-last-food-source
+      ;go-last-food-source
       alternative-last-food-source
       ;; Stray the ant from the direct route to the food with a probability setting its serendipity to ignore trails
       try-stray-from-path
@@ -541,7 +543,7 @@ end
 to look-for-food
   ;; Otherwise follow a pheromone or just search at random
   ifelse perceives-scent? pheromone-summon [   ;; original mecanism of pheromone following
-    join-chemical pheromone-summon
+      join-chemical pheromone-summon
   ][
     ifelse serendipity = 0 and perceives-trail? [   ;; original mecanism of pheromone following
       ;; Change the ant orientation depending on the pheromone that was perceived
@@ -568,7 +570,7 @@ to-report should-exploit?
   ;; we should also exploit if we find a new food source while looking for one
   if serendipity > 0 AND f-memory = feedernumber [ report False ]
   ;; if this is one of the ants with Honwy dew prelation and it finds a food source other than HD it ignores it
-  if prelationHD AND (food-type != 4)  [report False]
+  if prelationHD AND (food-type != 4) AND ticks < 500 [report False]
   ;; If we get here this is the first food souce found by the ant, exploit!
   report True
 end
@@ -678,7 +680,7 @@ to follow-ant
       set loss-count 0	
     ] ;; if i was following some one but i dont see him for a period i rather go searching again	
   ]	[
-    ;; We don't have a leader nearby, switch back to searching
+    ;;We don't have a leader nearby, switch back to searching
     set state "searching"	
   ]
 end
@@ -707,7 +709,7 @@ to exploit
       config-load-and-food
     ][
      ;; Is there the scent of food? -> move towards higher concentrations of it	
-     ifelse food-scent > 0.1	[ uphill food-scent ]	
+     ifelse food-scent > 0.1	[uphill food-scent ]
       [
         ;; there is no food around, get back to searching
         set state "searching"
@@ -854,7 +856,8 @@ to exploiting-bug
     ]
     [ return-to-nest-bug ]
   ]
-  [ return-to-nest-bug
+  [
+    return-to-nest-bug
     if nest? [set state "searching"]
   ]
 end
@@ -1088,7 +1091,7 @@ to alternative-last-food-source
     ]
   ifelse is-last-waypoint? and ( not any? patches in-radius 3 with [ food? ] ) [
       reset-waypoints
-      set f-memory 0
+      ;set f-memory 0
       set state "searching"
     ] [
       set-next-waypoint
@@ -1211,7 +1214,7 @@ population
 population
 1
 100
-50.0
+5.0
 1
 1
 NIL
@@ -1260,7 +1263,7 @@ ran-seed
 ran-seed
 0
 10000
-0.0
+14.0
 1
 1
 NIL
@@ -1316,7 +1319,7 @@ seeds
 seeds
 0
 200
-0.0
+14.0
 1
 1
 NIL
@@ -1331,7 +1334,7 @@ bugs
 bugs
 0
 100
-0.0
+6.0
 1
 1
 NIL
@@ -1346,7 +1349,7 @@ dead-bugs
 dead-bugs
 0
 100
-0.0
+7.0
 1
 1
 NIL
@@ -1361,7 +1364,7 @@ honeydew
 honeydew
 0
 20
-20.0
+0.0
 1
 1
 NIL
@@ -1405,7 +1408,7 @@ INPUTBOX
 1507
 183
 pheromone-diffusion-rates
-[ 3 0.1 0.3 ]
+[ 1 0.1 0.3 ]
 1
 0
 String
@@ -1416,7 +1419,7 @@ INPUTBOX
 1633
 183
 pheromone-evaporation-rates
-[ 0 3 3 ]
+[ 1 3 0.1 ]
 1
 0
 String
@@ -1429,7 +1432,7 @@ CHOOSER
 pheromone-return
 pheromone-return
 1 2 3
-0
+2
 
 SLIDER
 12
@@ -1513,7 +1516,7 @@ SWITCH
 112
 fixed-food?
 fixed-food?
-0
+1
 1
 -1000
 
@@ -1550,7 +1553,7 @@ SWITCH
 226
 memory-on
 memory-on
-1
+0
 1
 -1000
 
@@ -1561,7 +1564,7 @@ SWITCH
 270
 mechanical-recruit
 mechanical-recruit
-1
+0
 1
 -1000
 
@@ -1572,7 +1575,7 @@ SWITCH
 182
 chemical-recruit
 chemical-recruit
-1
+0
 1
 -1000
 
@@ -1583,7 +1586,7 @@ SWITCH
 315
 serendipity-on
 serendipity-on
-1
+0
 1
 -1000
 
@@ -1717,7 +1720,7 @@ SWITCH
 103
 prelation
 prelation
-1
+0
 1
 -1000
 
@@ -1729,7 +1732,7 @@ CHOOSER
 pheromone-summon
 pheromone-summon
 1 2 3
-1
+0
 
 TEXTBOX
 13
@@ -1779,7 +1782,7 @@ CHOOSER
 pheromone-ephemeral
 pheromone-ephemeral
 1 2 3
-2
+1
 
 TEXTBOX
 1765
