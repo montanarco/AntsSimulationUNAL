@@ -128,13 +128,13 @@ to prepare-csv-file
 end
 
 to writeCSVrow [#fname #vals]
-  ;file-open #fname
-  ;file-type first #vals
-  ;foreach but-first #vals [[?] ->
-  ;  file-type "," file-type ?
-  ;]
-  ;file-print ""  ;;terminate line with CR
-  ;file-close
+  file-open #fname
+  file-type first #vals
+  foreach but-first #vals [[?] ->
+    file-type "," file-type ?
+  ]
+  file-print ""  ;;terminate line with CR
+  file-close
 end
 
 to writeListToFile [#mylist #fname]
@@ -526,8 +526,8 @@ to search
   [
     ;; when the ant remembers a location where it has found any food, it goes back to check if there is more unless it is trying to search for more sources
     ifelse serendipity = 0 AND f-memory != 0 [
-      ;go-last-food-source
-      alternative-last-food-source
+      go-last-food-source
+      ;alternative-last-food-source
       ;; Stray the ant from the direct route to the food with a probability setting its serendipity to ignore trails
       try-stray-from-path
     ]
@@ -682,6 +682,7 @@ to follow-ant
   ]	[
     ;;We don't have a leader nearby, switch back to searching
     set state "searching"	
+    ;;reset-waypoints
   ]
 end
 
@@ -1091,7 +1092,7 @@ to alternative-last-food-source
     ]
   ifelse is-last-waypoint? and ( not any? patches in-radius 3 with [ food? ] ) [
       reset-waypoints
-      ;set f-memory 0
+      set f-memory 0
       set state "searching"
     ] [
       set-next-waypoint
@@ -1214,7 +1215,7 @@ population
 population
 1
 100
-5.0
+40.0
 1
 1
 NIL
@@ -1263,7 +1264,7 @@ ran-seed
 ran-seed
 0
 10000
-14.0
+22.0
 1
 1
 NIL
@@ -1319,7 +1320,7 @@ seeds
 seeds
 0
 200
-14.0
+22.0
 1
 1
 NIL
@@ -1334,7 +1335,7 @@ bugs
 bugs
 0
 100
-6.0
+18.0
 1
 1
 NIL
@@ -1349,7 +1350,7 @@ dead-bugs
 dead-bugs
 0
 100
-7.0
+16.0
 1
 1
 NIL
@@ -1364,7 +1365,7 @@ honeydew
 honeydew
 0
 20
-0.0
+6.0
 1
 1
 NIL
@@ -1443,7 +1444,7 @@ seeds-spawn-probability
 seeds-spawn-probability
 0
 10
-0.0
+0.1
 0.1
 1
 %
@@ -1458,7 +1459,7 @@ bugs-spawn-probability
 bugs-spawn-probability
 0
 10
-0.0
+0.1
 0.1
 1
 %
@@ -1473,7 +1474,7 @@ dead-bugs-spawn-probability
 dead-bugs-spawn-probability
 0
 10
-0.0
+0.1
 0.1
 1
 %
@@ -1575,7 +1576,7 @@ SWITCH
 182
 chemical-recruit
 chemical-recruit
-0
+1
 1
 -1000
 
